@@ -18,7 +18,7 @@ public class LoadDatabase {
 			try {
 				Class.forName("oracle.jdbc.driver.OracleDriver");
 				DriverManager.registerDriver(new oracle.jdbc.driver.OracleDriver());
-				String url = "jdbc:oracle:thin:@localhost:1521:xe";
+				String url = "jdbc:oracle:thin:@172.17.0.53:1521:xe";
 				String user = "w4cash";
 				String password = "w4cash";
 				DBConnection = DriverManager.getConnection(url, user, password);

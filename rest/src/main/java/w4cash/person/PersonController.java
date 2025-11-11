@@ -40,24 +40,25 @@ class PersonController {
 	// tag::get-aggregate-root[]
 	@GetMapping("/persons")
 	CollectionModel<EntityModel<Person>> all() {
-		List<EntityModel<Person>> person = new ArrayList<>();
+		List<EntityModel<Person>> persons = new ArrayList<>();
 		try {
 
 			PreparedStatement st = LoadDatabase.DBConnection
-					.prepareStatement("SELECT ID, CODE, NAME, PRICESELL, CATEGORY FROM PRODUCTS");
+					.prepareStatement("SELECT ID, NAME, APPPASSWORD, CARD, ROLE, IMAGE FROM PEOPLE");
 			ResultSet rs = st.executeQuery();
 			repository.deleteAll();
 			while (rs.next()) {
 				String id = rs.getString("ID");
-				String code = rs.getString("CODE");
 				String name = rs.getString("NAME");
-				float pricesell = rs.getFloat("PRICESELL");
-				String category = rs.getString("CATEGORY");
-				this.repository.save(new Person(id, code, name, pricesell, category));
+				String apppassword = rs.getString("APPPASSWORD");
+				String card = rs.getString("CARD");
+				String role = rs.getString("ROLE");
+				String image = rs.getString("IMAGE");
+				this.repository.save(new Person(id, name, apppassword, card, role, image));
 			}
 			persons = repository.findAll().stream()
 					.map(person -> EntityModel.of(person,
-							linkTo(methodOn(PersonController.class).one(person.getCode())).withSelfRel(),
+							linkTo(methodOn(PersonController.class).one(person.getId_())).withSelfRel(),
 							linkTo(methodOn(PersonController.class).all()).withRel("person")))
 					.collect(Collectors.toList());
 		} catch (SQLException e) {
@@ -76,25 +77,25 @@ class PersonController {
 	// Single item
 
 	// tag::get-single-item[]
-	@GetMapping("/persons/{code}")
-	EntityModel<Person> one(@PathVariable String code) {
+	@GetMapping("/persons/{id}")
+	EntityModel<Person> one(@PathVariable String id_) {
 
-		Person person = repository.findById(code) //
-				.orElseThrow(() -> new PersonNotFoundException(code));
+		Person person = repository.findById(id_) //
+				.orElseThrow(() -> new PersonNotFoundException(id_));
 
 		return EntityModel.of(person, //
-				linkTo(methodOn(PersonController.class).one(code)).withSelfRel(),
+				linkTo(methodOn(PersonController.class).one(id_)).withSelfRel(),
 				linkTo(methodOn(PersonController.class).all()).withRel("employees"));
 	}
 	// end::get-single-item[]
 
-	@PutMapping("/persons/{code}")
-	Person replaceEmployee(@RequestBody Person newPerson, @PathVariable String code) {
+	@PutMapping("/persons/{id}")
+	Person replacePerson(@RequestBody Person newPerson, @PathVariable String id_) {
 
-		return repository.findById(code) //
-				.map(employee -> {
-					employee.setName(newPerson.getName());
-					employee.setCategory(newPerson.getCategory());
+		return repository.findById(id_) //
+				.map(person -> {
+					person.setName(newPerson.getName());
+					person.setApppassword(newPerson.getApppassword());
 					return repository.save(person);
 				}) //
 				.orElseGet(() -> {
@@ -102,8 +103,8 @@ class PersonController {
 				});
 	}
 
-	@DeleteMapping("/persons/{code}")
-	void deleteEmployee(@PathVariable String code) {
-		repository.deleteById(code);
+	@DeleteMapping("/persons/{id}")
+	void deletePerson(@PathVariable String id_) {
+		repository.deleteById(id_);
 	}
 }
