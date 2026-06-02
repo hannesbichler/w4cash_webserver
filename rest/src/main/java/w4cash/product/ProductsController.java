@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.HtmlUtils;
 
 import w4cash.LoadDatabase;
 
@@ -35,72 +36,65 @@ class ProductsController {
 	// Aggregate root
 
 	// tag::get-aggregate-root[]
-	@GetMapping("/products")
-	CollectionModel<EntityModel<Product>> all() {
+	@GetMapping("/products/{categoryId}")
+	CollectionModel<EntityModel<Product>> all(@PathVariable String categoryId) {
 		List<EntityModel<Product>> products = new ArrayList<>();
-		try {
-
-			PreparedStatement st = LoadDatabase.DBConnection
-					.prepareStatement("SELECT ID, CODE, NAME, PRICESELL, CATEGORY FROM PRODUCTS");
-			ResultSet rs = st.executeQuery();
-			repository.deleteAll();
-			while (rs.next()) {
-				String id = rs.getString("ID");
-				String code = rs.getString("CODE");
-				String name = rs.getString("NAME");
-				float pricesell = rs.getFloat("PRICESELL");
-				String category = rs.getString("CATEGORY");
-				this.repository.save(new Product(id, code, name, pricesell, category));
+		try (PreparedStatement st = LoadDatabase.DBConnection
+				.prepareStatement("SELECT ID, CODE, NAME, PRICESELL, CATEGORY FROM PRODUCTS where CATEGORY = ?")) {
+			st.setString(1, categoryId);
+			try (ResultSet rs = st.executeQuery()) {
+				repository.deleteAll();
+				while (rs.next()) {
+					String id = rs.getString("ID");
+					String code = HtmlUtils.htmlEscape(rs.getString("CODE"));
+					String name = HtmlUtils.htmlEscape(rs.getString("NAME"));
+					float pricesell = rs.getFloat("PRICESELL");
+					// String categoryId = HtmlUtils.htmlEscape(rs.getString("CATEGORY"));
+					this.repository.save(new Product(id, code, name, pricesell, categoryId));
+				}
 			}
 			products = repository.findAll().stream()
-					.map(product -> EntityModel.of(product,
-							linkTo(methodOn(ProductsController.class).one(product.getCode())).withSelfRel(),
-							linkTo(methodOn(ProductsController.class).all()).withRel("product")))
+					.map(product -> EntityModel.of(product// ,
+					// linkTo(methodOn(ProductsController.class).one(product.getId())).withSelfRel(),
+					// linkTo(methodOn(ProductsController.class).all()).withRel("product")
+					))
 					.collect(Collectors.toList());
 		} catch (SQLException e) {
 			// TODO: handle exception
 		}
 
-		return CollectionModel.of(products, linkTo(methodOn(ProductsController.class).all()).withSelfRel());
+		return CollectionModel.of(products, linkTo(methodOn(ProductsController.class).all(categoryId)).withSelfRel());
 	}
-	// end::get-aggregate-root[]
-
-	// @PostMapping("/employees")
-	// Product newEmployee(@RequestBody Product newEmployee) {
-	// return repository.save(newEmployee);
-	// }
-
-	// Single item
 
 	// tag::get-single-item[]
-	@GetMapping("/product/{code}")
-	EntityModel<Product> one(@PathVariable String code) {
+	@GetMapping("/product/{id}")
+	EntityModel<Product> one(@PathVariable Long id) {
 
-		Product product = repository.findById(code) //
-				.orElseThrow(() -> new ProductNotFoundException(code));
+		Product product = repository.findById(id) //
+				.orElseThrow(() -> new ProductNotFoundException(id));
 
 		return EntityModel.of(product, //
-				linkTo(methodOn(ProductsController.class).one(code)).withSelfRel(),
-				linkTo(methodOn(ProductsController.class).all()).withRel("employees"));
+				linkTo(methodOn(ProductsController.class).one(id)).withSelfRel(),
+				linkTo(methodOn(ProductsController.class).all(product.getCategoryId())).withRel("employees"));
 	}
 	// end::get-single-item[]
 
-	@PutMapping("/employees/{code}")
-	Product replaceEmployee(@RequestBody Product newEmployee, @PathVariable String code) {
+	@PutMapping("/product/{id}")
+	Product replaceEmployee(@RequestBody Product newProduct, @PathVariable Long id) {
 
-		return repository.findById(code) //
-				.map(employee -> {
-					employee.setName(newEmployee.getName());
-					employee.setCategory(newEmployee.getCategory());
-					return repository.save(employee);
+		return repository.findById(id) //
+				.map(product -> {
+					product.setName(newProduct.getName());
+					product.setCategoryId(newProduct.getCategoryId());
+					return repository.save(product);
 				}) //
 				.orElseGet(() -> {
-					return repository.save(newEmployee);
+					return repository.save(newProduct);
 				});
 	}
 
-	@DeleteMapping("/employees/{code}")
-	void deleteEmployee(@PathVariable String code) {
-		repository.deleteById(code);
+	@DeleteMapping("/products/{id}")
+	void deleteProduct(@PathVariable Long id) {
+		repository.deleteById(id);
 	}
 }

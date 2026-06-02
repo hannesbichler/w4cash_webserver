@@ -38,6 +38,14 @@
 			<scope>runtime</scope>
 		</dependency>
 
+		<dependency>
+			<groupId>w4cash</groupId>
+			<artifactId>w4cash</artifactId>
+			<version>1.0</version>
+			<scope>system</scope>
+			<systemPath>${project.basedir}/../lib/w4cash.jar</systemPath>
+		</dependency>
+
 	</dependencies>
 
 	<build>

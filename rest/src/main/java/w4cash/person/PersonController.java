@@ -18,9 +18,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import w4cash.person.Person;
-import w4cash.person.PersonNotFoundException;
-import w4cash.person.PersonRepository;
 import w4cash.LoadDatabase;
 
 // tag::hateoas-imports[]
@@ -41,11 +38,9 @@ class PersonController {
 	@GetMapping("/persons")
 	CollectionModel<EntityModel<Person>> all() {
 		List<EntityModel<Person>> persons = new ArrayList<>();
-		try {
-
-			PreparedStatement st = LoadDatabase.DBConnection
-					.prepareStatement("SELECT ID, NAME, APPPASSWORD, CARD, ROLE, IMAGE FROM PEOPLE");
-			ResultSet rs = st.executeQuery();
+		try (PreparedStatement st = LoadDatabase.DBConnection
+				.prepareStatement("SELECT ID, NAME, APPPASSWORD, CARD, ROLE, IMAGE FROM PEOPLE");
+				ResultSet rs = st.executeQuery()) {
 			repository.deleteAll();
 			while (rs.next()) {
 				String id = rs.getString("ID");
@@ -53,15 +48,17 @@ class PersonController {
 				String apppassword = rs.getString("APPPASSWORD");
 				String card = rs.getString("CARD");
 				String role = rs.getString("ROLE");
-				String image = rs.getString("IMAGE");
-				this.repository.save(new Person(id, name, apppassword, card, role, image));
+				// String image = rs.getString("IMAGE");
+				this.repository.save(new Person(id, name, apppassword, card, role, ""));
 			}
 			persons = repository.findAll().stream()
-					.map(person -> EntityModel.of(person,
-							linkTo(methodOn(PersonController.class).one(person.getId_())).withSelfRel(),
-							linkTo(methodOn(PersonController.class).all()).withRel("person")))
+					.map(person -> EntityModel.of(person// ,
+					// linkTo(methodOn(PersonController.class).one(person.getId())).withSelfRel(),
+					// linkTo(methodOn(PersonController.class).all()).withRel("person")
+					))
 					.collect(Collectors.toList());
 		} catch (SQLException e) {
+			e.printStackTrace();
 			// TODO: handle exception
 		}
 
@@ -78,21 +75,21 @@ class PersonController {
 
 	// tag::get-single-item[]
 	@GetMapping("/persons/{id}")
-	EntityModel<Person> one(@PathVariable String id_) {
+	EntityModel<Person> one(@PathVariable Long id) {
 
-		Person person = repository.findById(id_) //
-				.orElseThrow(() -> new PersonNotFoundException(id_));
+		Person person = repository.findById(id) //
+				.orElseThrow(() -> new PersonNotFoundException(id));
 
 		return EntityModel.of(person, //
-				linkTo(methodOn(PersonController.class).one(id_)).withSelfRel(),
+				linkTo(methodOn(PersonController.class).one(id)).withSelfRel(),
 				linkTo(methodOn(PersonController.class).all()).withRel("employees"));
 	}
 	// end::get-single-item[]
 
 	@PutMapping("/persons/{id}")
-	Person replacePerson(@RequestBody Person newPerson, @PathVariable String id_) {
+	Person replacePerson(@RequestBody Person newPerson, @PathVariable Long id) {
 
-		return repository.findById(id_) //
+		return repository.findById(id) //
 				.map(person -> {
 					person.setName(newPerson.getName());
 					person.setApppassword(newPerson.getApppassword());
@@ -104,7 +101,7 @@ class PersonController {
 	}
 
 	@DeleteMapping("/persons/{id}")
-	void deletePerson(@PathVariable String id_) {
+	void deletePerson(@PathVariable Long id_) {
 		repository.deleteById(id_);
 	}
 }
