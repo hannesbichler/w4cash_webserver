@@ -17,9 +17,9 @@ class OrderItem {
     private @Id @GeneratedValue Long id;
     private String id_ = "";
     private int tickettype = 0;
-    private int m_iTicketId = 0;
+    private int ticketId = 0;
     @ElementCollection(fetch = FetchType.EAGER)
-    private List<OrderLine> m_aLines = new java.util.ArrayList<>();
+    private List<OrderLine> lines = new java.util.ArrayList<>();
 
     public String getId_() {
         return id_;
@@ -38,19 +38,19 @@ class OrderItem {
     }
 
     public int getTicketId() {
-        return m_iTicketId;
+        return ticketId;
     }
 
     public void setTicketId(int ticketId) {
-        this.m_iTicketId = ticketId;
+        this.ticketId = ticketId;
     }
 
     public List<OrderLine> getLines() {
-        return m_aLines;
+        return lines;
     }
 
     public void setLines(List<OrderLine> lines) {
-        this.m_aLines = lines;
+        this.lines = lines;
     }
 
     @Override
@@ -63,18 +63,18 @@ class OrderItem {
         OrderItem orderItem = (OrderItem) o;
         return Objects.equals(this.id, orderItem.id) && Objects.equals(this.id_, orderItem.id_)
                 && Objects.equals(this.tickettype, orderItem.tickettype)
-                && Objects.equals(this.m_iTicketId, orderItem.m_iTicketId)
-                && Objects.equals(this.m_aLines, orderItem.m_aLines);
+                && Objects.equals(this.ticketId, orderItem.ticketId)
+                && Objects.equals(this.lines, orderItem.lines);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.id, this.id_, this.tickettype, this.m_iTicketId, this.m_aLines);
+        return Objects.hash(this.id, this.id_, this.tickettype, this.ticketId, this.lines);
     }
 
     @Override
     public String toString() {
         return "OrderItem{id:" + this.id + ",id_:" + this.id_ + ", tickettype:" + this.tickettype + ", ticketId:"
-                + this.m_iTicketId + ", lines:" + this.m_aLines + "}";
+                + this.ticketId + ", lines:" + this.lines + "}";
     }
 }

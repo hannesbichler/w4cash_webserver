@@ -34,13 +34,42 @@ class ProductsController {
 	}
 
 	// Aggregate root
+	// tag::get-aggregate-root[]
+	@GetMapping("/products")
+	CollectionModel<EntityModel<Product>> all() {
+		List<EntityModel<Product>> products = new ArrayList<>();
+		try (PreparedStatement st = LoadDatabase.DBConnection
+				.prepareStatement(
+						"SELECT ID, CODE, NAME, PRICESELL, CATEGORY, ATTRIBUTESET_ID FROM PRODUCTS")) {
+			try (ResultSet rs = st.executeQuery()) {
+				repository.deleteAll();
+				while (rs.next()) {
+					String id = rs.getString("ID");
+					String code = HtmlUtils.htmlEscape(rs.getString("CODE"));
+					String name = HtmlUtils.htmlEscape(rs.getString("NAME"));
+					float pricesell = rs.getFloat("PRICESELL");
+					String categoryId = rs.getString("CATEGORY");
+					String attributeSetId = rs.getString("ATTRIBUTESET_ID");
+					this.repository.save(new Product(id, code, name, pricesell, categoryId, attributeSetId));
+				}
+			}
+			products = repository.findAll().stream()
+					.map(product -> EntityModel.of(product))
+					.collect(Collectors.toList());
+		} catch (SQLException e) {
+			// TODO: handle exception
+		}
+
+		return CollectionModel.of(products, linkTo(methodOn(ProductsController.class).all()).withSelfRel());
+	}
 
 	// tag::get-aggregate-root[]
 	@GetMapping("/products/{categoryId}")
 	CollectionModel<EntityModel<Product>> all(@PathVariable String categoryId) {
 		List<EntityModel<Product>> products = new ArrayList<>();
 		try (PreparedStatement st = LoadDatabase.DBConnection
-				.prepareStatement("SELECT ID, CODE, NAME, PRICESELL, CATEGORY FROM PRODUCTS where CATEGORY = ?")) {
+				.prepareStatement(
+						"SELECT ID, CODE, NAME, PRICESELL, CATEGORY, ATTRIBUTESET_ID FROM PRODUCTS where CATEGORY = ?")) {
 			st.setString(1, categoryId);
 			try (ResultSet rs = st.executeQuery()) {
 				repository.deleteAll();
@@ -49,15 +78,12 @@ class ProductsController {
 					String code = HtmlUtils.htmlEscape(rs.getString("CODE"));
 					String name = HtmlUtils.htmlEscape(rs.getString("NAME"));
 					float pricesell = rs.getFloat("PRICESELL");
-					// String categoryId = HtmlUtils.htmlEscape(rs.getString("CATEGORY"));
-					this.repository.save(new Product(id, code, name, pricesell, categoryId));
+					String attributeSetId = rs.getString("ATTRIBUTESET_ID");
+					this.repository.save(new Product(id, code, name, pricesell, categoryId, attributeSetId));
 				}
 			}
 			products = repository.findAll().stream()
-					.map(product -> EntityModel.of(product// ,
-					// linkTo(methodOn(ProductsController.class).one(product.getId())).withSelfRel(),
-					// linkTo(methodOn(ProductsController.class).all()).withRel("product")
-					))
+					.map(product -> EntityModel.of(product))
 					.collect(Collectors.toList());
 		} catch (SQLException e) {
 			// TODO: handle exception
@@ -73,9 +99,7 @@ class ProductsController {
 		Product product = repository.findById(id) //
 				.orElseThrow(() -> new ProductNotFoundException(id));
 
-		return EntityModel.of(product, //
-				linkTo(methodOn(ProductsController.class).one(id)).withSelfRel(),
-				linkTo(methodOn(ProductsController.class).all(product.getCategoryId())).withRel("employees"));
+		return EntityModel.of(product);
 	}
 	// end::get-single-item[]
 

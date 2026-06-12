@@ -13,6 +13,7 @@ class Product {
 	// category: row.CATEGORY
 	private @Id @GeneratedValue Long id;
 	private String id_;
+	private String attributeSetId;
 	private String code;
 	private String name;
 	private float pricesell;
@@ -21,13 +22,14 @@ class Product {
 	Product() {
 	}
 
-	// id, code, name, pricesell, category
-	Product(String id_, String code, String name, float pricesell, String categoryId) {
+	// id, code, name, pricesell, category, attributeSetId
+	Product(String id_, String code, String name, float pricesell, String categoryId, String attributeSetId) {
 		this.id_ = id_;
 		this.code = code;
 		this.name = name;
 		this.pricesell = pricesell;
 		this.categoryId = categoryId;
+		this.attributeSetId = attributeSetId;
 	}
 
 	public Long getId() {
@@ -36,6 +38,10 @@ class Product {
 
 	public String getId_() {
 		return this.id_;
+	}
+
+	public String getAttributeSetId() {
+		return this.attributeSetId;
 	}
 
 	public String getCode() {
@@ -78,6 +84,10 @@ class Product {
 		this.categoryId = categoryId;
 	}
 
+	public void setAttributeSetId(String attributeSetId) {
+		this.attributeSetId = attributeSetId;
+	}
+
 	@Override
 	public boolean equals(Object o) {
 
@@ -97,7 +107,7 @@ class Product {
 	@Override
 	public String toString() {
 		return "Product{id:" + this.id + ",id_:" + this.id_ + ", name:'" + this.name + "'" + ", category:'"
-				+ this.categoryId + "'"
+				+ this.categoryId + "'" + ", attributeSetId:'" + this.attributeSetId + "'"
 				+ '}';
 	}
 }

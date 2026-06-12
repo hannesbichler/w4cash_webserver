@@ -47,7 +47,7 @@ class CategoryController {
 				String id = rs.getString("ID");
 				String name = HtmlUtils.htmlEscape(rs.getString("NAME"));
 				String parentId = rs.getString("PARENTID");
-				var category = new Category(id, name, parentId);
+				Category category = new Category(id, name, parentId);
 
 				this.repository.findAll().stream().filter(c -> c.getId_().equals(parentId)).findFirst()
 						.ifPresentOrElse(parent -> parent.getChildren().add(category), () -> {

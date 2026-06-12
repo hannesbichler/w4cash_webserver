@@ -1,6 +1,11 @@
 package w4cash.ticketinfo;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import jakarta.persistence.Embeddable;
+import jakarta.persistence.Transient;
+import w4cash.attribute.Attribute;
 
 @Embeddable
 public class OrderLine {
@@ -10,17 +15,30 @@ public class OrderLine {
     private String productName;
     private double pricesell;
     private double qty;
+    private String productAttSetId;
+    private String attSetInstDesc;
+    @Transient
+    private List<Attribute> attributes = new ArrayList<>();
 
     public OrderLine() {
     }
 
-    public OrderLine(String id, String orderId, String productId, String productName, double pricesell, double qty) {
+    public OrderLine(String id, String orderId, String productId, String productName, double pricesell, double qty,
+            String productAttSetId, String attSetInstDesc) {
+        this(id, orderId, productId, productName, pricesell, qty, productAttSetId, attSetInstDesc, new ArrayList<>());
+    }
+
+    public OrderLine(String id, String orderId, String productId, String productName, double pricesell, double qty,
+            String productAttSetId, String attSetInstDesc, List<Attribute> attributes) {
         this.id = id;
         this.orderId = orderId;
         this.productId = productId;
         this.productName = productName;
         this.pricesell = pricesell;
         this.qty = qty;
+        this.productAttSetId = productAttSetId;
+        this.attSetInstDesc = attSetInstDesc;
+        this.attributes = attributes;
     }
 
     public String getId() {
@@ -69,5 +87,29 @@ public class OrderLine {
 
     public void setQty(double qty) {
         this.qty = qty;
+    }
+
+    public String getProductAttSetId() {
+        return productAttSetId;
+    }
+
+    public void setProductAttSetId(String productAttSetId) {
+        this.productAttSetId = productAttSetId;
+    }
+
+    public String getAttSetInstDesc() {
+        return attSetInstDesc;
+    }
+
+    public void setAttSetInstDesc(String attSetInstDesc) {
+        this.attSetInstDesc = attSetInstDesc;
+    }
+
+    public List<Attribute> getAttributes() {
+        return attributes;
+    }
+
+    public void setAttributes(List<Attribute> attributes) {
+        this.attributes = attributes;
     }
 }

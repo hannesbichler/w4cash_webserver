@@ -16,7 +16,8 @@
             "name": "W4cashApplication",
             "request": "launch",
             "mainClass": "w4cash.W4cashApplication",
-            "projectName": "rest"
+            "projectName": "rest",
+            "javaExec": "C:/Program Files (x86)/Java/openjdk-21.0.4.0.7-1/bin/java.exe"
         }
     ]
 }
