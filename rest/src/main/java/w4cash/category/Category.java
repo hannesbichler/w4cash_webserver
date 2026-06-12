@@ -1,31 +1,31 @@
 package w4cash.category;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Transient;
 
 @Entity
 class Category {
 
     private @Id @GeneratedValue Long id;
-
+    private String id_;
     private String name;
-    private Long parentId;
-    private String image;
-    private String bgcolor;
-    private Integer sortOrder;
-    private String printer;
+    private String parentId;
+    @Transient
+    private List<Category> children;
 
     public Category() {
     }
 
-    public Category(String name, Long parentId, String image, String bgcolor, Integer sortOrder, String printer) {
+    public Category(String id_, String name, String parentId) {
+        this.id_ = id_;
         this.name = name;
         this.parentId = parentId;
-        this.image = image;
-        this.bgcolor = bgcolor;
-        this.sortOrder = sortOrder;
-        this.printer = printer;
     }
 
     public Long getId() {
@@ -36,6 +36,14 @@ class Category {
         this.id = id;
     }
 
+    public String getId_() {
+        return this.id_;
+    }
+
+    public void setId_(String id_) {
+        this.id_ = id_;
+    }
+
     public String getName() {
         return name;
     }
@@ -44,44 +52,46 @@ class Category {
         this.name = name;
     }
 
-    public Long getParentId() {
+    public String getParentId() {
         return parentId;
     }
 
-    public void setParentId(Long parentId) {
+    public void setParentId(String parentId) {
         this.parentId = parentId;
+
     }
 
-    public String getImage() {
-        return image;
+    public List<Category> getChildren() {
+        if (this.children == null) {
+            this.children = new ArrayList<Category>();
+        }
+        return children;
     }
 
-    public void setImage(String image) {
-        this.image = image;
+    public void setChildren(List<Category> children) {
+        this.children = children;
     }
 
-    public String getBgcolor() {
-        return bgcolor;
+    @Override
+    public boolean equals(Object o) {
+
+        if (this == o)
+            return true;
+        if (!(o instanceof Category))
+            return false;
+        Category category = (Category) o;
+        return Objects.equals(this.id, category.id) && Objects.equals(this.id_, category.id_)
+                && Objects.equals(this.name, category.name) && Objects.equals(this.parentId, category.parentId);
     }
 
-    public void setBgcolor(String bgcolor) {
-        this.bgcolor = bgcolor;
+    @Override
+    public int hashCode() {
+        return Objects.hash(this.id, this.id_, this.name, this.parentId);
     }
 
-    public Integer getSortOrder() {
-        return sortOrder;
+    @Override
+    public String toString() {
+        return "Category {" + "id=" + this.id + ", id_='" + this.id_ + '\'' + ", name='" + this.name + '\''
+                + ", parentId='" + this.parentId + '\'' + '}';
     }
-
-    public void setSortOrder(Integer sortOrder) {
-        this.sortOrder = sortOrder;
-    }
-
-    public String getPrinter() {
-        return printer;
-    }
-
-    public void setPrinter(String printer) {
-        this.printer = printer;
-    }
-
 }

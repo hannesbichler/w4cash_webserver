@@ -95,8 +95,8 @@ class Person {
 			return true;
 		if (!(o instanceof Person))
 			return false;
-		Person product = (Person) o;
-		return Objects.equals(this.id, product.id) && Objects.equals(this.name, product.name);
+		Person person = (Person) o;
+		return Objects.equals(this.id, person.id) && Objects.equals(this.name, person.name);
 	}
 
 	@Override
@@ -106,7 +106,7 @@ class Person {
 
 	@Override
 	public String toString() {
-		return "Product{" + "id=" + this.id + ", name='" + this.name + '\'' + ", role='" + this.role + '\''
+		return "Person {" + "id=" + this.id + ", name='" + this.name + '\'' + ", role='" + this.role + '\''
 				+ '}';
 	}
 }

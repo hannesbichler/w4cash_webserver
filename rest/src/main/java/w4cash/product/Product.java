@@ -13,21 +13,23 @@ class Product {
 	// category: row.CATEGORY
 	private @Id @GeneratedValue Long id;
 	private String id_;
+	private String attributeSetId;
 	private String code;
 	private String name;
 	private float pricesell;
-	private String category;
+	private String categoryId;
 
 	Product() {
 	}
 
-	// id, code, name, pricesell, category
-	Product(String id_, String code, String name, float pricesell, String category) {
+	// id, code, name, pricesell, category, attributeSetId
+	Product(String id_, String code, String name, float pricesell, String categoryId, String attributeSetId) {
 		this.id_ = id_;
 		this.code = code;
 		this.name = name;
 		this.pricesell = pricesell;
-		this.category = category;
+		this.categoryId = categoryId;
+		this.attributeSetId = attributeSetId;
 	}
 
 	public Long getId() {
@@ -36,6 +38,10 @@ class Product {
 
 	public String getId_() {
 		return this.id_;
+	}
+
+	public String getAttributeSetId() {
+		return this.attributeSetId;
 	}
 
 	public String getCode() {
@@ -50,8 +56,8 @@ class Product {
 		return this.pricesell;
 	}
 
-	public String getCategory() {
-		return this.category;
+	public String getCategoryId() {
+		return this.categoryId;
 	}
 
 	public void setId(Long id) {
@@ -74,8 +80,12 @@ class Product {
 		this.pricesell = pricesell;
 	}
 
-	public void setCategory(String category) {
-		this.category = category;
+	public void setCategoryId(String categoryId) {
+		this.categoryId = categoryId;
+	}
+
+	public void setAttributeSetId(String attributeSetId) {
+		this.attributeSetId = attributeSetId;
 	}
 
 	@Override
@@ -96,7 +106,8 @@ class Product {
 
 	@Override
 	public String toString() {
-		return "Product{" + "id=" + this.id + ", name='" + this.name + '\'' + ", category='" + this.category + '\''
+		return "Product{id:" + this.id + ",id_:" + this.id_ + ", name:'" + this.name + "'" + ", category:'"
+				+ this.categoryId + "'" + ", attributeSetId:'" + this.attributeSetId + "'"
 				+ '}';
 	}
 }

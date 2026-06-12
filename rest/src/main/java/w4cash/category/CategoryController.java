@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.HtmlUtils;
 
 import w4cash.LoadDatabase;
 
@@ -35,39 +36,38 @@ class CategoryController {
 	// Aggregate root
 
 	// tag::get-aggregate-root[]
-	/*
-	 * @GetMapping("/categories")
-	 * CollectionModel<EntityModel<Category>> all() {
-	 * List<EntityModel<Category>> category = new ArrayList<>();
-	 * try {
-	 * 
-	 * PreparedStatement st = LoadDatabase.DBConnection
-	 * .prepareStatement("SELECT ID, CODE, NAME, PRICESELL, CATEGORY FROM PRODUCTS"
-	 * );
-	 * ResultSet rs = st.executeQuery();
-	 * repository.deleteAll();
-	 * while (rs.next()) {
-	 * String id = rs.getString("ID");
-	 * String code = rs.getString("CODE");
-	 * String name = rs.getString("NAME");
-	 * float pricesell = rs.getFloat("PRICESELL");
-	 * String category = rs.getString("CATEGORY");
-	 * this.repository.save(new Category(id, code, name, pricesell, category));
-	 * }
-	 * categories = repository.findAll().stream()
-	 * .map(category -> EntityModel.of(category,
-	 * linkTo(methodOn(CategoryController.class).one(person.getCode())).withSelfRel(
-	 * ),
-	 * linkTo(methodOn(CategoryController.class).all()).withRel("person")))
-	 * .collect(Collectors.toList());
-	 * } catch (SQLException e) {
-	 * // TODO: handle exception
-	 * }
-	 * 
-	 * return CollectionModel.of(categories,
-	 * linkTo(methodOn(CategoryController.class).all()).withSelfRel());
-	 * }
-	 */
+	@GetMapping("/categories")
+	CollectionModel<EntityModel<Category>> all() {
+		List<EntityModel<Category>> categories = new ArrayList<>();
+		try (PreparedStatement st = LoadDatabase.DBConnection
+				.prepareStatement("SELECT ID, NAME, PARENTID FROM CATEGORIES");
+				ResultSet rs = st.executeQuery()) {
+			repository.deleteAll();
+			while (rs.next()) {
+				String id = rs.getString("ID");
+				String name = HtmlUtils.htmlEscape(rs.getString("NAME"));
+				String parentId = rs.getString("PARENTID");
+				Category category = new Category(id, name, parentId);
+
+				this.repository.findAll().stream().filter(c -> c.getId_().equals(parentId)).findFirst()
+						.ifPresentOrElse(parent -> parent.getChildren().add(category), () -> {
+							this.repository.save(category);
+						});
+
+			}
+
+			categories = repository.findAll().stream()
+					.map(category -> EntityModel.of(category// ,
+					// linkTo(methodOn(CategoryController.class).one(category.getId())).withSelfRel(),
+					// linkTo(methodOn(CategoryController.class).all()).withRel("categories")
+					))
+					.collect(Collectors.toList());
+		} catch (SQLException e) {
+			// TODO: handle exception
+		}
+
+		return CollectionModel.of(categories, linkTo(methodOn(CategoryController.class).all()).withSelfRel());
+	}
 	// end::get-aggregate-root[]
 
 	// @PostMapping("/employees")
@@ -78,38 +78,33 @@ class CategoryController {
 	// Single item
 
 	// tag::get-single-item[]
-	/*
-	 * @GetMapping("/category/{code}")
-	 * EntityModel<Category> one(@PathVariable String code) {
-	 * 
-	 * Category category = repository.findById(code) //
-	 * .orElseThrow(() -> new CategoryNotFoundException(code));
-	 * 
-	 * return EntityModel.of(category, //
-	 * linkTo(methodOn(CategoryController.class).one(code)).withSelfRel(),
-	 * linkTo(methodOn(CategoryController.class).all()).withRel("employees"));
-	 * }
-	 */
-	// end::get-single-item[]
-	/*
-	 * @PutMapping("/category/{code}")
-	 * Category replaceEmployee(@RequestBody Category newCategory, @PathVariable
-	 * String code) {
-	 * 
-	 * return repository.findById(code) //
-	 * .map(category -> {
-	 * employee.setName(newPerson.getName());
-	 * employee.setCategory(newPerson.getCategory());
-	 * return repository.save(person);
-	 * }) //
-	 * .orElseGet(() -> {
-	 * return repository.save(newPerson);
-	 * });
-	 * }
-	 */
+	@GetMapping("/category/{id}")
+	EntityModel<Category> one(@PathVariable Long id) {
 
-	@DeleteMapping("/categories/{code}")
-	void deleteEmployee(@PathVariable String code) {
-		repository.deleteById(code);
+		Category category = repository.findById(id) //
+				.orElseThrow(() -> new CategoryNotFoundException(id));
+
+		return EntityModel.of(category, //
+				linkTo(methodOn(CategoryController.class).one(id)).withSelfRel(),
+				linkTo(methodOn(CategoryController.class).all()).withRel("categories"));
+	}
+	// end::get-single-item[]
+
+	@PutMapping("/category/{id}")
+	Category replaceCategory(@RequestBody Category newCategory, @PathVariable Long id) {
+
+		return repository.findById(id) //
+				.map(category -> {
+					category.setName(newCategory.getName());
+					return repository.save(category);
+				}) //
+				.orElseGet(() -> {
+					return repository.save(newCategory);
+				});
+	}
+
+	@DeleteMapping("/category/{id}")
+	void deleteCategory(@PathVariable Long id) {
+		repository.deleteById(id);
 	}
 }
