@@ -3,8 +3,10 @@ package w4cash.ticketinfo;
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -12,6 +14,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
 import org.springframework.hateoas.CollectionModel;
@@ -27,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.openbravo.pos.ticket.TicketInfo;
+import com.openbravo.pos.ticket.TicketLineInfo;
 
 import w4cash.LoadDatabase;
 import w4cash.attribute.Attribute;
@@ -112,6 +116,23 @@ class TicketInfoController {
 
 	}
 
+	private byte[] encodeContent(TicketInfo ticketInfo) {
+		if (ticketInfo == null) {
+			logger.warn("encodeContent called with null TicketInfo");
+			return new byte[0];
+		}
+
+		try (ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
+				ObjectOutputStream objectOut = new ObjectOutputStream(byteOut)) {
+			objectOut.writeObject(ticketInfo);
+			objectOut.flush();
+			return byteOut.toByteArray();
+		} catch (IOException ex) {
+			logger.error("Failed to serialize TicketInfo", ex);
+			return new byte[0];
+		}
+	}
+
 	private OrderItem decodeContent(byte[] content) {
 		OrderItem orderItem = new OrderItem();
 		if (content == null || content.length == 0) {
@@ -161,8 +182,12 @@ class TicketInfoController {
 		ticketInfo.getLines().forEach(line -> {
 			String attSetInstDesc = line.getProductAttSetInstDesc();
 			List<Attribute> attributes = parseAttributes(attSetInstDesc);
+			var productName = line.getProductName();
+			if (productName != null) {
+				productName = HtmlUtils.htmlEscape(productName);
+			}
 			orderItem.getLines().add(new OrderLine(
-					"", "", line.getProductID(), HtmlUtils.htmlEscape(line.getProductName()), line.getPrice(),
+					"", "", line.getProductID(), productName, line.getPrice(),
 					line.getMultiply(), line.getProductAttSetId(),
 					HtmlUtils.htmlEscape(attSetInstDesc), attributes));
 		});
@@ -186,13 +211,13 @@ class TicketInfoController {
 	}
 
 	// tag::get-single-item[]
-	@GetMapping("/orderitem/{id}")
-	EntityModel<OrderItem> one(@PathVariable String id) {
+	@GetMapping("/orderitem/{tableId}/{tableName}")
+	EntityModel<OrderItem> one(@PathVariable String tableId, @PathVariable String tableName) {
 
 		SharedTicket sharedTicket = null;
 		try (PreparedStatement st = LoadDatabase.DBConnection
 				.prepareStatement("SELECT ID, NAME, CONTENT, LOCKBY FROM SHAREDTICKETS where ID = ?")) {
-			st.setString(1, id);
+			st.setString(1, tableId);
 			try (ResultSet rs = st.executeQuery()) {
 				while (rs.next()) {
 					String id_ = rs.getString("ID");
@@ -214,9 +239,22 @@ class TicketInfoController {
 			// orderitem.setTickettype(sharedTicket.getTickettype());
 		} else {
 			orderitem = new OrderItem();
-			// add new orderitem to sharedTicket and save it to database
-			sharedTicket = new SharedTicket(id, "New Ticket", null, null);
-			repository.save(sharedTicket);
+			orderitem.setId_(tableId);
+
+			var ticketinfo = new TicketInfo();
+			byte[] content = encodeContent(ticketinfo);
+			// Add a new empty shared ticket row for this table on first access.
+			try (PreparedStatement insertSt = LoadDatabase.DBConnection
+					.prepareStatement("INSERT INTO SHAREDTICKETS (ID, NAME, CONTENT, LOCKBY) VALUES (?, ?, ?, ?)")) {
+				insertSt.setString(1, tableId);
+				insertSt.setString(2, tableName);
+				insertSt.setBytes(3, content);
+				insertSt.setString(4, "test");
+				insertSt.executeUpdate();
+				// sharedTicket = new SharedTicket(tableId, tableName, content, null);
+			} catch (SQLException e) {
+				logger.error("Failed to insert SHAREDTICKETS row for tableId={}", tableId, e);
+			}
 		}
 
 		// now we have to decode content and create orderitem with orderlines and then
@@ -227,6 +265,53 @@ class TicketInfoController {
 
 	@PutMapping("/orderitem/{id}")
 	OrderItem replaceOrderItem(@RequestBody OrderItem newOrderItem, @PathVariable String id) {
+		var ticketInfo = new TicketInfo();
+		ticketInfo.SetInfo(id);
+		newOrderItem.getLines().forEach(line -> {
+			var proinfoext = new com.openbravo.pos.ticket.ProductInfoExt();
+			proinfoext.setID(line.getProductId());
+			proinfoext.setName(line.getProductName());
+			proinfoext.setPriceSell(line.getPricesell());
+			// proinfoext.setAttributeSetID(line.getAttSetInstDesc());
+
+			// get all infos from product
+			try (PreparedStatement st = LoadDatabase.DBConnection
+					.prepareStatement(
+							"SELECT ID, REFERENCE, CODE, NAME, PRICEBUY, PRICESELL, TAXCAT, CATEGORY, ATTRIBUTESET_ID, BGCOLOR, UNIT "
+									+ "FROM PRODUCTS WHERE ID = ?")) {
+				st.setString(1, line.getProductId());
+				try (ResultSet rs = st.executeQuery()) {
+					if (rs.next()) {
+						proinfoext.setID(rs.getString("ID"));
+						proinfoext.setName(rs.getString("NAME"));
+						proinfoext.setPriceSell(rs.getDouble("PRICESELL"));
+						proinfoext.setAttributeSetID(rs.getString("ATTRIBUTESET_ID"));
+						proinfoext.setCategoryID(rs.getString("CATEGORY"));
+						proinfoext.setCode(rs.getString("CODE"));
+						proinfoext.setReference(rs.getString("REFERENCE"));
+						proinfoext.setPriceBuy(rs.getDouble("PRICEBUY"));
+						proinfoext.setTaxCategoryID(rs.getString("TAXCAT"));
+						proinfoext.setBgColor(rs.getString("BGCOLOR"));
+						proinfoext.setUnit(rs.getString("UNIT"));
+					}
+				}
+			} catch (SQLException e) {
+				logger.error("Failed to fetch product info for id={}", line.getProductId(), e);
+			}
+			var ticketLineInfo = new TicketLineInfo(proinfoext, line.getQty(), line.getPricesell(), null,
+					new Properties(), false, null, null, null, null);
+			ticketLineInfo.setProductAttSetInstDesc(line.getAttSetInstDesc());
+			ticketInfo.getLines().add(ticketLineInfo);
+		});
+		byte[] content = encodeContent(ticketInfo);
+		try (PreparedStatement st = LoadDatabase.DBConnection
+				.prepareStatement("UPDATE SHAREDTICKETS SET CONTENT = ? where ID = ?")) {
+			st.setBytes(1, content);
+			st.setString(2, id);
+			st.executeUpdate();
+		} catch (SQLException e) {
+			logger.error("Failed to update SHAREDTICKETS for id={}", id, e);
+		}
 		return newOrderItem;
 		/*
 		 * return repository.findById(id) //
@@ -238,6 +323,17 @@ class TicketInfoController {
 		 * return repository.save(new SharedTicket(id, "", new byte[0], ""));
 		 * });
 		 */
+	}
+
+	@DeleteMapping("/orderitem/{id}")
+	void deleteOrderItem(@PathVariable String id) {
+		try (PreparedStatement st = LoadDatabase.DBConnection
+				.prepareStatement("DELETE FROM SHAREDTICKETS where ID = ?")) {
+			st.setString(1, id);
+			st.executeUpdate();
+		} catch (SQLException e) {
+			logger.error("Failed to delete SHAREDTICKETS for id={}", id, e);
+		}
 	}
 
 	@DeleteMapping("/TicketInfo/{id}")
