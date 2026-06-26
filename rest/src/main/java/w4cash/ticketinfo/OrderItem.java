@@ -20,9 +20,18 @@ class OrderItem {
     private int ticketId = 0;
     @ElementCollection(fetch = FetchType.EAGER)
     private List<OrderLine> lines = new java.util.ArrayList<>();
+    private String lockby = "";
 
     public String getId_() {
         return id_;
+    }
+
+    public String getLockby() {
+        return lockby;
+    }
+
+    public void setLockby(String lockby) {
+        this.lockby = lockby;
     }
 
     public void setId_(String id_) {
@@ -64,17 +73,18 @@ class OrderItem {
         return Objects.equals(this.id, orderItem.id) && Objects.equals(this.id_, orderItem.id_)
                 && Objects.equals(this.tickettype, orderItem.tickettype)
                 && Objects.equals(this.ticketId, orderItem.ticketId)
-                && Objects.equals(this.lines, orderItem.lines);
+                && Objects.equals(this.lines, orderItem.lines)
+                && Objects.equals(this.lockby, orderItem.lockby);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.id, this.id_, this.tickettype, this.ticketId, this.lines);
+        return Objects.hash(this.id, this.id_, this.tickettype, this.ticketId, this.lines, this.lockby);
     }
 
     @Override
     public String toString() {
         return "OrderItem{id:" + this.id + ",id_:" + this.id_ + ", tickettype:" + this.tickettype + ", ticketId:"
-                + this.ticketId + ", lines:" + this.lines + "}";
+                + this.ticketId + ", lines:" + this.lines + ", lockby:" + this.lockby + "}";
     }
 }

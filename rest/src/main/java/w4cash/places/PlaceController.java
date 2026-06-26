@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -25,7 +27,7 @@ import w4cash.LoadDatabase;
 
 @RestController
 class PlaceController {
-
+	private static final Logger logger = LoggerFactory.getLogger(PlaceController.class);
 	private final PlaceRepository repository;
 
 	PlaceController(PlaceRepository repository) {
@@ -37,6 +39,7 @@ class PlaceController {
 	// tag::get-aggregate-root[]
 	@GetMapping("/places/{floorId}")
 	CollectionModel<EntityModel<Place>> all(@PathVariable String floorId) {
+		logger.info("GET /places/{} request was called", floorId);
 		List<EntityModel<Place>> places = new ArrayList<>();
 		try (PreparedStatement st = LoadDatabase.DBConnection
 				.prepareStatement("SELECT ID, NAME FROM PLACES WHERE FLOOR = ?")) {

@@ -15,6 +15,7 @@ public class OrderLine {
     private String productName;
     private double pricesell;
     private double qty;
+    private double newQty;
     private String productAttSetId;
     private String attSetInstDesc;
     @Transient
@@ -24,18 +25,20 @@ public class OrderLine {
     }
 
     public OrderLine(String id, String orderId, String productId, String productName, double pricesell, double qty,
-            String productAttSetId, String attSetInstDesc) {
-        this(id, orderId, productId, productName, pricesell, qty, productAttSetId, attSetInstDesc, new ArrayList<>());
+            double newQty, String productAttSetId, String attSetInstDesc) {
+        this(id, orderId, productId, productName, pricesell, qty, newQty, productAttSetId, attSetInstDesc,
+                new ArrayList<>());
     }
 
     public OrderLine(String id, String orderId, String productId, String productName, double pricesell, double qty,
-            String productAttSetId, String attSetInstDesc, List<Attribute> attributes) {
+            double newQty, String productAttSetId, String attSetInstDesc, List<Attribute> attributes) {
         this.id = id;
         this.orderId = orderId;
         this.productId = productId;
         this.productName = productName;
         this.pricesell = pricesell;
         this.qty = qty;
+        this.newQty = newQty;
         this.productAttSetId = productAttSetId;
         this.attSetInstDesc = attSetInstDesc;
         this.attributes = attributes;
@@ -87,6 +90,14 @@ public class OrderLine {
 
     public void setQty(double qty) {
         this.qty = qty;
+    }
+
+    public double getNewQty() {
+        return newQty;
+    }
+
+    public void setNewQty(double newQty) {
+        this.newQty = newQty;
     }
 
     public String getProductAttSetId() {

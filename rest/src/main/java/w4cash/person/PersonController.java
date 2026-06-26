@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -25,6 +27,7 @@ import w4cash.LoadDatabase;
 
 @RestController
 class PersonController {
+	private static final Logger logger = LoggerFactory.getLogger(PersonController.class);
 
 	private final PersonRepository repository;
 
@@ -37,6 +40,7 @@ class PersonController {
 	// tag::get-aggregate-root[]
 	@GetMapping("/persons")
 	CollectionModel<EntityModel<Person>> all() {
+		logger.info("GET /persons request was called");
 		List<EntityModel<Person>> persons = new ArrayList<>();
 		try (PreparedStatement st = LoadDatabase.DBConnection
 				.prepareStatement("SELECT ID, NAME, APPPASSWORD, CARD, ROLE, IMAGE FROM PEOPLE");
@@ -48,14 +52,10 @@ class PersonController {
 				String apppassword = rs.getString("APPPASSWORD");
 				String card = rs.getString("CARD");
 				String role = rs.getString("ROLE");
-				// String image = rs.getString("IMAGE");
 				this.repository.save(new Person(id, name, apppassword, card, role, ""));
 			}
 			persons = repository.findAll().stream()
-					.map(person -> EntityModel.of(person// ,
-					// linkTo(methodOn(PersonController.class).one(person.getId())).withSelfRel(),
-					// linkTo(methodOn(PersonController.class).all()).withRel("person")
-					))
+					.map(person -> EntityModel.of(person))
 					.collect(Collectors.toList());
 		} catch (SQLException e) {
 			e.printStackTrace();
@@ -101,7 +101,7 @@ class PersonController {
 	}
 
 	@DeleteMapping("/persons/{id}")
-	void deletePerson(@PathVariable Long id_) {
-		repository.deleteById(id_);
+	void deletePerson(@PathVariable Long id) {
+		repository.deleteById(id);
 	}
 }

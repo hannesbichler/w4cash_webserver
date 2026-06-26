@@ -17,6 +17,9 @@ import java.util.List;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
+import javax.print.PrintService;
+import javax.print.PrintServiceLookup;
+
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -188,7 +191,7 @@ class TicketInfoController {
 			}
 			orderItem.getLines().add(new OrderLine(
 					"", "", line.getProductID(), productName, line.getPrice(),
-					line.getMultiply(), line.getProductAttSetId(),
+					line.getMultiply(), 0, line.getProductAttSetId(),
 					HtmlUtils.htmlEscape(attSetInstDesc), attributes));
 		});
 		return orderItem;
@@ -211,9 +214,11 @@ class TicketInfoController {
 	}
 
 	// tag::get-single-item[]
-	@GetMapping("/orderitem/{tableId}/{tableName}")
-	EntityModel<OrderItem> one(@PathVariable String tableId, @PathVariable String tableName) {
-
+	@GetMapping("/orderitem/{tableId}/{tableName}/{lockby}")
+	EntityModel<OrderItem> one(@PathVariable String tableId, @PathVariable String tableName,
+			@PathVariable String lockby) {
+		logger.info("GET /orderitem request was called for tableId={}, tableName={}, lockby={}", tableId, tableName,
+				lockby);
 		SharedTicket sharedTicket = null;
 		try (PreparedStatement st = LoadDatabase.DBConnection
 				.prepareStatement("SELECT ID, NAME, CONTENT, LOCKBY FROM SHAREDTICKETS where ID = ?")) {
@@ -223,8 +228,10 @@ class TicketInfoController {
 					String id_ = rs.getString("ID");
 					String name = HtmlUtils.htmlEscape(rs.getString("NAME"));
 					byte[] content = rs.getBytes("CONTENT");
-					String lockby = rs.getString("LOCKBY");
-					sharedTicket = new SharedTicket(id_, name, content, lockby);
+					String lockbyfrom = rs.getString("LOCKBY");
+					// TODO if lockbyfrom is not null and not equal to lockby, then return error or
+					// empty orderitem
+					sharedTicket = new SharedTicket(id_, name, content, lockbyfrom);
 					break;
 				}
 			}
@@ -236,6 +243,7 @@ class TicketInfoController {
 		if (sharedTicket != null) {
 			orderitem = decodeContent(sharedTicket.getContent());
 			orderitem.setId_(sharedTicket.getSId());
+			orderitem.setLockby(sharedTicket.getLockby());
 			// orderitem.setTickettype(sharedTicket.getTickettype());
 		} else {
 			orderitem = new OrderItem();
@@ -249,7 +257,7 @@ class TicketInfoController {
 				insertSt.setString(1, tableId);
 				insertSt.setString(2, tableName);
 				insertSt.setBytes(3, content);
-				insertSt.setString(4, "test");
+				insertSt.setString(4, lockby);
 				insertSt.executeUpdate();
 				// sharedTicket = new SharedTicket(tableId, tableName, content, null);
 			} catch (SQLException e) {
@@ -263,68 +271,75 @@ class TicketInfoController {
 	}
 	// end::get-single-item[]
 
+	
+
 	@PutMapping("/orderitem/{id}")
 	OrderItem replaceOrderItem(@RequestBody OrderItem newOrderItem, @PathVariable String id) {
+		logger.info("PUT /orderitem request was called for id={}", id);
+		// printInstalledPrinters();
 		var ticketInfo = new TicketInfo();
 		ticketInfo.SetInfo(id);
-		newOrderItem.getLines().forEach(line -> {
-			var proinfoext = new com.openbravo.pos.ticket.ProductInfoExt();
-			proinfoext.setID(line.getProductId());
-			proinfoext.setName(line.getProductName());
-			proinfoext.setPriceSell(line.getPricesell());
-			// proinfoext.setAttributeSetID(line.getAttSetInstDesc());
-
-			// get all infos from product
+		if (newOrderItem.getLines() == null || newOrderItem.getLines().isEmpty()) {
+			// remove it from sharedtickets table
 			try (PreparedStatement st = LoadDatabase.DBConnection
-					.prepareStatement(
-							"SELECT ID, REFERENCE, CODE, NAME, PRICEBUY, PRICESELL, TAXCAT, CATEGORY, ATTRIBUTESET_ID, BGCOLOR, UNIT "
-									+ "FROM PRODUCTS WHERE ID = ?")) {
-				st.setString(1, line.getProductId());
-				try (ResultSet rs = st.executeQuery()) {
-					if (rs.next()) {
-						proinfoext.setID(rs.getString("ID"));
-						proinfoext.setName(rs.getString("NAME"));
-						proinfoext.setPriceSell(rs.getDouble("PRICESELL"));
-						proinfoext.setAttributeSetID(rs.getString("ATTRIBUTESET_ID"));
-						proinfoext.setCategoryID(rs.getString("CATEGORY"));
-						proinfoext.setCode(rs.getString("CODE"));
-						proinfoext.setReference(rs.getString("REFERENCE"));
-						proinfoext.setPriceBuy(rs.getDouble("PRICEBUY"));
-						proinfoext.setTaxCategoryID(rs.getString("TAXCAT"));
-						proinfoext.setBgColor(rs.getString("BGCOLOR"));
-						proinfoext.setUnit(rs.getString("UNIT"));
-					}
-				}
+					.prepareStatement("DELETE FROM SHAREDTICKETS where ID = ?")) {
+				st.setString(1, id);
+				st.executeUpdate();
 			} catch (SQLException e) {
-				logger.error("Failed to fetch product info for id={}", line.getProductId(), e);
+				logger.error("Failed to delete SHAREDTICKETS for id={}", id, e);
 			}
-			var ticketLineInfo = new TicketLineInfo(proinfoext, line.getQty(), line.getPricesell(), null,
-					new Properties(), false, null, null, null, null);
-			ticketLineInfo.setProductAttSetInstDesc(line.getAttSetInstDesc());
-			ticketInfo.getLines().add(ticketLineInfo);
-		});
-		byte[] content = encodeContent(ticketInfo);
-		try (PreparedStatement st = LoadDatabase.DBConnection
-				.prepareStatement("UPDATE SHAREDTICKETS SET CONTENT = ? where ID = ?")) {
-			st.setBytes(1, content);
-			st.setString(2, id);
-			st.executeUpdate();
-		} catch (SQLException e) {
-			logger.error("Failed to update SHAREDTICKETS for id={}", id, e);
+		} else {
+			newOrderItem.getLines().forEach(line -> {
+				var proinfoext = new com.openbravo.pos.ticket.ProductInfoExt();
+				proinfoext.setID(line.getProductId());
+				proinfoext.setName(line.getProductName());
+				proinfoext.setPriceSell(line.getPricesell());
+				// proinfoext.setAttributeSetID(line.getAttSetInstDesc());
+
+				// get all infos from product
+				try (PreparedStatement st = LoadDatabase.DBConnection
+						.prepareStatement(
+								"SELECT ID, REFERENCE, CODE, NAME, PRICEBUY, PRICESELL, TAXCAT, CATEGORY, ATTRIBUTESET_ID, BGCOLOR, UNIT "
+										+ "FROM PRODUCTS WHERE ID = ?")) {
+					st.setString(1, line.getProductId());
+					try (ResultSet rs = st.executeQuery()) {
+						if (rs.next()) {
+							proinfoext.setID(rs.getString("ID"));
+							proinfoext.setName(rs.getString("NAME"));
+							proinfoext.setPriceSell(rs.getDouble("PRICESELL"));
+							proinfoext.setAttributeSetID(rs.getString("ATTRIBUTESET_ID"));
+							proinfoext.setCategoryID(rs.getString("CATEGORY"));
+							proinfoext.setCode(rs.getString("CODE"));
+							proinfoext.setReference(rs.getString("REFERENCE"));
+							proinfoext.setPriceBuy(rs.getDouble("PRICEBUY"));
+							proinfoext.setTaxCategoryID(rs.getString("TAXCAT"));
+							proinfoext.setBgColor(rs.getString("BGCOLOR"));
+							proinfoext.setUnit(rs.getString("UNIT"));
+						}
+					}
+				} catch (SQLException e) {
+					logger.error("Failed to fetch product info for id={}", line.getProductId(), e);
+				}
+				var ticketLineInfo = new TicketLineInfo(proinfoext, line.getQty(), line.getPricesell(), null,
+						new Properties(), false, null, null, null, null);
+				ticketLineInfo.setProductAttSetInstDesc(line.getAttSetInstDesc());
+				ticketInfo.getLines().add(ticketLineInfo);
+			});
+			byte[] content = encodeContent(ticketInfo);
+			try (PreparedStatement st = LoadDatabase.DBConnection
+					.prepareStatement("UPDATE SHAREDTICKETS SET CONTENT = ?, LOCKBY = ? where ID = ?")) {
+				st.setBytes(1, content);
+				st.setString(2, newOrderItem.getLockby());
+				st.setString(3, id);
+				st.executeUpdate();
+			} catch (SQLException e) {
+				logger.error("Failed to update SHAREDTICKETS for id={}", id, e);
+			}
 		}
 		return newOrderItem;
-		/*
-		 * return repository.findById(id) //
-		 * .map(sharedTicket -> {
-		 * // sharedTicket.setName(newSharedTicket.getName());
-		 * return repository.save(sharedTicket);
-		 * }) //
-		 * .orElseGet(() -> {
-		 * return repository.save(new SharedTicket(id, "", new byte[0], ""));
-		 * });
-		 */
 	}
 
+	// not used any more, but kept for reference
 	@DeleteMapping("/orderitem/{id}")
 	void deleteOrderItem(@PathVariable String id) {
 		try (PreparedStatement st = LoadDatabase.DBConnection
@@ -333,6 +348,32 @@ class TicketInfoController {
 			st.executeUpdate();
 		} catch (SQLException e) {
 			logger.error("Failed to delete SHAREDTICKETS for id={}", id, e);
+		}
+	}
+
+	void printAllPrinters() {
+		try (PreparedStatement st = LoadDatabase.DBConnection.prepareStatement("SELECT ID, NAME FROM PRINTERS");
+				ResultSet rs = st.executeQuery()) {
+			while (rs.next()) {
+				String id = rs.getString("ID");
+				String name = HtmlUtils.htmlEscape(rs.getString("NAME"));
+				logger.info("Printer ID: {}, Name: {}", id, name);
+			}
+		} catch (SQLException e) {
+			logger.error("Failed to fetch printers", e);
+		}
+	}
+
+	void printInstalledPrinters() {
+		PrintService[] printers = PrintServiceLookup.lookupPrintServices(null, null);
+
+		if (printers.length == 0) {
+			System.out.println("No printers found.");
+			return;
+		}
+
+		for (PrintService printer : printers) {
+			System.out.println(printer.getName());
 		}
 	}
 

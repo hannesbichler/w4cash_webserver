@@ -5,6 +5,8 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.openbravo.pos.util.AltEncrypter;
+
 @Configuration
 public class LoadDatabase {
 
@@ -16,13 +18,19 @@ public class LoadDatabase {
 	CommandLineRunner initDatabase() {
 		return args -> {
 			try {
-				Class.forName("oracle.jdbc.driver.OracleDriver");
-				DriverManager.registerDriver(new oracle.jdbc.driver.OracleDriver());
-				String url = "jdbc:oracle:thin:@localhost:1521:xe";
-				String user = "w4cash";
-				String password = "w4cash";
+				var config = w4cash.W4cashApplication.APP_CONFIG;
+				var oadriver = Class.forName(config.getProperty("db.driver")).getDeclaredConstructor().newInstance();
+				DriverManager.registerDriver((Driver) oadriver);
+				String url = config.getProperty("db.URL");
+				String user = config.getProperty("db.user");
+				String password = config.getProperty("db.password");
+				if (user != null && password != null && password.startsWith("crypt:")) {
+					// the password is encrypted
+					AltEncrypter cypher = new AltEncrypter("cypherkey" + user);
+					password = cypher.decrypt(password.substring(6));
+				}
 				DBConnection = DriverManager.getConnection(url, user, password);
-			} catch (ClassNotFoundException | SQLException e) {
+			} catch (Exception e) {
 				java.util.logging.Logger.getLogger(LoadDatabase.class.getName()).severe(e.getMessage());
 			}
 		};
