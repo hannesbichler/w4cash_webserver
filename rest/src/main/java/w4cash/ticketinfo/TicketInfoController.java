@@ -37,6 +37,7 @@ import com.openbravo.pos.ticket.TicketLineInfo;
 
 import w4cash.LoadDatabase;
 import w4cash.attribute.Attribute;
+import w4cash.print.TicketPrintService;
 
 // tag::hateoas-imports[]
 // end::hateoas-imports[]
@@ -46,9 +47,11 @@ class TicketInfoController {
 	private static final Logger logger = LoggerFactory.getLogger(TicketInfoController.class);
 
 	private final SharedTicketRepository repository;
+	private final TicketPrintService ticketPrintService;
 
-	TicketInfoController(SharedTicketRepository repository) {
+	TicketInfoController(SharedTicketRepository repository, TicketPrintService ticketPrintService) {
 		this.repository = repository;
+		this.ticketPrintService = ticketPrintService;
 	}
 
 	// Aggregate root
@@ -244,10 +247,25 @@ class TicketInfoController {
 			orderitem = decodeContent(sharedTicket.getContent());
 			orderitem.setId_(sharedTicket.getSId());
 			orderitem.setLockby(sharedTicket.getLockby());
+			// update lockby in sharedtickets table if it is null or different from the
+			// current lockby
+			if (sharedTicket.getLockby() == null || !sharedTicket.getLockby().equals(lockby)) {
+				try (PreparedStatement updateSt = LoadDatabase.DBConnection
+						.prepareStatement("UPDATE SHAREDTICKETS SET LOCKBY = ? where ID = ?")) {
+					updateSt.setString(1, lockby);
+					updateSt.setString(2, tableId);
+					updateSt.executeUpdate();
+					sharedTicket.setLockby(lockby);
+				} catch (SQLException e) {
+					logger.error("Failed to update SHAREDTICKETS.LOCKBY for tableId={}", tableId, e);
+				}
+			}
 			// orderitem.setTickettype(sharedTicket.getTickettype());
 		} else {
 			orderitem = new OrderItem();
 			orderitem.setId_(tableId);
+			orderitem.setLockby(lockby);
+			orderitem.setKellner(lockby);
 
 			var ticketinfo = new TicketInfo();
 			byte[] content = encodeContent(ticketinfo);
@@ -259,7 +277,7 @@ class TicketInfoController {
 				insertSt.setBytes(3, content);
 				insertSt.setString(4, lockby);
 				insertSt.executeUpdate();
-				// sharedTicket = new SharedTicket(tableId, tableName, content, null);
+				// sharedTicket = new SharedTicket(tableId, tableName, content, lockby);
 			} catch (SQLException e) {
 				logger.error("Failed to insert SHAREDTICKETS row for tableId={}", tableId, e);
 			}
@@ -271,25 +289,19 @@ class TicketInfoController {
 	}
 	// end::get-single-item[]
 
-	
-
 	@PutMapping("/orderitem/{id}")
 	OrderItem replaceOrderItem(@RequestBody OrderItem newOrderItem, @PathVariable String id) {
 		logger.info("PUT /orderitem request was called for id={}", id);
 		// printInstalledPrinters();
 		var ticketInfo = new TicketInfo();
 		ticketInfo.SetInfo(id);
-		if (newOrderItem.getLines() == null || newOrderItem.getLines().isEmpty()) {
-			// remove it from sharedtickets table
-			try (PreparedStatement st = LoadDatabase.DBConnection
-					.prepareStatement("DELETE FROM SHAREDTICKETS where ID = ?")) {
-				st.setString(1, id);
-				st.executeUpdate();
-			} catch (SQLException e) {
-				logger.error("Failed to delete SHAREDTICKETS for id={}", id, e);
-			}
-		} else {
+		if (newOrderItem.getLines() != null) {
 			newOrderItem.getLines().forEach(line -> {
+				if (line.getQty() <= 0) {
+					logger.warn("Skipping line with non-positive quantity: productId={}, productName={}, qty={}",
+							line.getProductId(), line.getProductName(), line.getQty());
+					return;
+				}
 				var proinfoext = new com.openbravo.pos.ticket.ProductInfoExt();
 				proinfoext.setID(line.getProductId());
 				proinfoext.setName(line.getProductName());
@@ -325,6 +337,17 @@ class TicketInfoController {
 				ticketLineInfo.setProductAttSetInstDesc(line.getAttSetInstDesc());
 				ticketInfo.getLines().add(ticketLineInfo);
 			});
+		}
+		if (ticketInfo.getLines() == null || ticketInfo.getLines().isEmpty()) {
+			// remove it from sharedtickets table
+			try (PreparedStatement st = LoadDatabase.DBConnection
+					.prepareStatement("DELETE FROM SHAREDTICKETS where ID = ?")) {
+				st.setString(1, id);
+				st.executeUpdate();
+			} catch (SQLException e) {
+				logger.error("Failed to delete SHAREDTICKETS for id={}", id, e);
+			}
+		} else {
 			byte[] content = encodeContent(ticketInfo);
 			try (PreparedStatement st = LoadDatabase.DBConnection
 					.prepareStatement("UPDATE SHAREDTICKETS SET CONTENT = ?, LOCKBY = ? where ID = ?")) {
@@ -336,6 +359,7 @@ class TicketInfoController {
 				logger.error("Failed to update SHAREDTICKETS for id={}", id, e);
 			}
 		}
+		ticketPrintService.printOrderTicket(id, newOrderItem);
 		return newOrderItem;
 	}
 

@@ -39,6 +39,9 @@ class TicketInfoControllerTest {
     @MockBean
     SharedTicketRepository repository;
 
+    @MockBean
+    w4cash.print.TicketPrintService ticketPrintService;
+
     private Connection mockConnection;
 
     // Default SELECT statement (used for SHAREDTICKETS SELECTs and ATTRIBUTEVALUE)
@@ -175,14 +178,14 @@ class TicketInfoControllerTest {
     // ── PUT /orderitem/{id} ───────────────────────────────────────────────────
 
     @Test
-    void putOrderItem_withNoLines_updatesDatabase() throws Exception {
+    void putOrderItem_withNoLines_deletesFromDatabase() throws Exception {
         mockMvc.perform(put("/orderitem/table1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"id_\":\"table1\",\"lines\":[]}"))
                 .andExpect(status().isOk());
 
-        verify(mockUpdateStmt).setString(2, "table1");
-        verify(mockUpdateStmt).executeUpdate();
+        verify(mockDeleteStmt).setString(1, "table1");
+        verify(mockDeleteStmt).executeUpdate();
     }
 
     @Test

@@ -10,7 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 
 @Entity
-class OrderItem {
+public class OrderItem {
 
     // id: row.ID, code:row.CODE, name: row.NAME, pricesell: row.PRICESELL,
     // category: row.CATEGORY
@@ -21,9 +21,18 @@ class OrderItem {
     @ElementCollection(fetch = FetchType.EAGER)
     private List<OrderLine> lines = new java.util.ArrayList<>();
     private String lockby = "";
+    private String kellner = "";
 
     public String getId_() {
         return id_;
+    }
+
+    public String getKellner() {
+        return kellner;
+    }
+
+    public void setKellner(String kellner) {
+        this.kellner = kellner;
     }
 
     public String getLockby() {
@@ -74,17 +83,19 @@ class OrderItem {
                 && Objects.equals(this.tickettype, orderItem.tickettype)
                 && Objects.equals(this.ticketId, orderItem.ticketId)
                 && Objects.equals(this.lines, orderItem.lines)
-                && Objects.equals(this.lockby, orderItem.lockby);
+                && Objects.equals(this.lockby, orderItem.lockby)
+                && Objects.equals(this.kellner, orderItem.kellner);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.id, this.id_, this.tickettype, this.ticketId, this.lines, this.lockby);
+        return Objects.hash(this.id, this.id_, this.tickettype, this.ticketId, this.lines, this.lockby, this.kellner);
     }
 
     @Override
     public String toString() {
         return "OrderItem{id:" + this.id + ",id_:" + this.id_ + ", tickettype:" + this.tickettype + ", ticketId:"
-                + this.ticketId + ", lines:" + this.lines + ", lockby:" + this.lockby + "}";
+                + this.ticketId + ", lines:" + this.lines + ", lockby:" + this.lockby + ", kellner:" + this.kellner
+                + "}";
     }
 }

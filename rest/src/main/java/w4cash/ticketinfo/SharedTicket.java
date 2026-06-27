@@ -50,6 +50,10 @@ class SharedTicket {
         return m_lockby;
     }
 
+    public void setLockby(String lockby) {
+        this.m_lockby = lockby;
+    }
+
     @Override
     public int hashCode() {
         return Objects.hash(m_sId);

@@ -13,10 +13,12 @@ C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\ticketinfo\OrderLine.ja
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\ticketinfo\TicketInfoRepository.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\attribute\AttributeGroupsController.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\product\ProductsRepository.java
+C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\print\TicketPrintService.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\floors\FloorRepository.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\LoadDatabase.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\WebConfig.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\category\CategoryNotFoundException.java
+C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\print\PrinterWritterPrintService.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\person\PersonController.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\attribute\AttributeGroup.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\person\PersonRepository.java
