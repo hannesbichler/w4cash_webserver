@@ -3,7 +3,12 @@ package w4cash.auth;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.Map;
+import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,29 +21,43 @@ import w4cash.LoadDatabase;
 @RequestMapping("/auth/otp")
 public class OtpController {
 
-    private final OtpService otpService;
-    private final PersonPhoneRepository personPhoneRepository;
+    private static final Logger logger = LoggerFactory.getLogger(OtpController.class);
 
-    OtpController(OtpService otpService, PersonPhoneRepository personPhoneRepository) {
+    private final OtpService otpService;
+
+    OtpController(OtpService otpService) {
         this.otpService = otpService;
-        this.personPhoneRepository = personPhoneRepository;
     }
 
-    /** Send OTP to the given phone number. Returns 404 if no user is registered for that number. */
+    @EventListener(ApplicationReadyEvent.class)
+    public void logSamplePhone() {
+        try (PreparedStatement st = LoadDatabase.DBConnection.prepareStatement(
+                "SELECT NAME, CARD FROM PEOPLE WHERE CARD IS NOT NULL AND CARD <> '' LIMIT 1");
+             ResultSet rs = st.executeQuery()) {
+            if (rs.next()) {
+                logger.info("Sample phone for OTP testing — user: '{}', card/phone: '{}'",
+                        rs.getString("NAME"), rs.getString("CARD"));
+            }
+        } catch (Exception e) {
+            logger.warn("Could not read sample phone: {}", e.getMessage());
+        }
+    }
+
+    /** Send OTP to the given phone number. Returns 404 if no person has that card value. */
     @PostMapping("/send")
     ResponseEntity<Map<String, String>> send(@RequestBody Map<String, String> body) {
         String phone = body.get("phone");
         if (phone == null || phone.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "phone required"));
         }
-        if (personPhoneRepository.findByPhone(normalize(phone)).isEmpty()) {
-            return ResponseEntity.status(404).body(Map.of("error", "no user registered for this number"));
+        if (findPersonByCard(normalize(phone)).isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("error", "no user found for this number"));
         }
         otpService.generate(phone);
         return ResponseEntity.ok(Map.of("status", "sent"));
     }
 
-    /** Verify OTP and return the matching person's id_ and name. */
+    /** Verify OTP and return the matching person. */
     @PostMapping("/verify")
     ResponseEntity<Map<String, String>> verify(@RequestBody Map<String, String> body) {
         String phone = body.get("phone");
@@ -49,42 +68,29 @@ public class OtpController {
         if (!otpService.verify(phone, otp)) {
             return ResponseEntity.status(401).body(Map.of("error", "invalid otp"));
         }
-        return personPhoneRepository.findByPhone(normalize(phone))
-                .map(pp -> queryPerson(pp.getPersonId()))
-                .map(p -> ResponseEntity.ok(p))
+        return findPersonByCard(normalize(phone))
+                .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.status(404).body(Map.of("error", "user not found")));
     }
 
-    /** Register (or update) the phone number for a person after they have already logged in with password. */
-    @PostMapping("/register")
-    ResponseEntity<Map<String, String>> register(@RequestBody Map<String, String> body) {
-        String personId = body.get("personId");
-        String phone = body.get("phone");
-        if (personId == null || phone == null || phone.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "personId and phone required"));
-        }
-        personPhoneRepository.save(new PersonPhone(normalize(phone), personId));
-        return ResponseEntity.ok(Map.of("status", "registered"));
-    }
-
-    private Map<String, String> queryPerson(String personId) {
+    private Optional<Map<String, String>> findPersonByCard(String card) {
         try (PreparedStatement st = LoadDatabase.DBConnection.prepareStatement(
-                "SELECT ID, NAME, APPPASSWORD, CARD, ROLE FROM PEOPLE WHERE ID = ?")) {
-            st.setString(1, personId);
+                "SELECT ID, NAME, APPPASSWORD, CARD, ROLE FROM PEOPLE WHERE CARD = ?")) {
+            st.setString(1, card);
             try (ResultSet rs = st.executeQuery()) {
                 if (rs.next()) {
-                    return Map.of(
-                            "id_", rs.getString("ID"),
-                            "name", rs.getString("NAME"),
+                    return Optional.of(Map.of(
+                            "id_",         rs.getString("ID"),
+                            "name",        rs.getString("NAME"),
                             "apppassword", rs.getString("APPPASSWORD") != null ? rs.getString("APPPASSWORD") : "",
-                            "card", rs.getString("CARD") != null ? rs.getString("CARD") : "",
-                            "role", rs.getString("ROLE") != null ? rs.getString("ROLE") : "");
+                            "card",        rs.getString("CARD") != null ? rs.getString("CARD") : "",
+                            "role",        rs.getString("ROLE") != null ? rs.getString("ROLE") : ""));
                 }
             }
         } catch (Exception e) {
-            // fall through
+            logger.warn("DB error looking up card '{}': {}", card, e.getMessage());
         }
-        return Map.of();
+        return Optional.empty();
     }
 
     private String normalize(String phone) {
