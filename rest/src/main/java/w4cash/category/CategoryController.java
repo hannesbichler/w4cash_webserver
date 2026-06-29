@@ -40,14 +40,15 @@ class CategoryController {
 	CollectionModel<EntityModel<Category>> all() {
 		List<EntityModel<Category>> categories = new ArrayList<>();
 		try (PreparedStatement st = LoadDatabase.DBConnection
-				.prepareStatement("SELECT ID, NAME, PARENTID FROM CATEGORIES");
+				.prepareStatement("SELECT ID, NAME, PARENTID, PRINTER FROM CATEGORIES");
 				ResultSet rs = st.executeQuery()) {
 			repository.deleteAll();
 			while (rs.next()) {
 				String id = rs.getString("ID");
 				String name = HtmlUtils.htmlEscape(rs.getString("NAME"));
 				String parentId = rs.getString("PARENTID");
-				Category category = new Category(id, name, parentId);
+				int printer = rs.getInt("PRINTER");
+				Category category = new Category(id, name, parentId, printer);
 
 				this.repository.findAll().stream().filter(c -> c.getId_().equals(parentId)).findFirst()
 						.ifPresentOrElse(parent -> parent.getChildren().add(category), () -> {

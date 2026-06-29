@@ -13,7 +13,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import javax.print.Doc;
 import javax.print.DocFlavor;
@@ -33,6 +37,7 @@ import com.openbravo.pos.printer.escpos.DevicePrinterPlain;
 import w4cash.LoadDatabase;
 import w4cash.W4cashApplication;
 import w4cash.ticketinfo.OrderItem;
+import w4cash.ticketinfo.OrderLine;
 
 @Service
 public class TicketPrintService {
@@ -46,32 +51,58 @@ public class TicketPrintService {
     }
 
     public void printOrderTicket(String tableId, @NonNull OrderItem orderItem) {
-        int lineCount = orderItem != null && orderItem.getLines() != null ? orderItem.getLines().size() : 0;
-        String printerName = queryPrinterName();
-        if (printerName == null) {
-            logger.warn("No printer configured in PRINTERS table — skipping print for tableId={}", tableId);
-            return;
-        }
-
-        PrintService printService = findPrintService(printerName);
-        if (printService == null) {
-            logger.warn("PrintService '{}' not found on this system — skipping print for tableId={}", printerName,
-                    tableId);
-            return;
-        }
-
+        var printerNames = queryPrinterNames();
         String tableName = queryTableName(tableId);
-        logger.info("Starting ticket print for tableId={}, tableName='{}', lines={}, configuredPrinter='{}'",
-                tableId,
-                tableName,
-                lineCount,
-                printerName);
 
+        // Group lines by the printer index derived from their product's category
+        Map<Integer, List<OrderLine>> linesByPrinter = new HashMap<>();
+        if (orderItem != null && orderItem.getLines() != null) {
+            for (OrderLine line : orderItem.getLines()) {
+                if ((int) line.getNewQty() == 0) {
+                    continue;
+                }
+                int printerIndex = queryPrinterIndexForProduct(line.getProductId());
+                linesByPrinter.computeIfAbsent(printerIndex, k -> new ArrayList<>()).add(line);
+            }
+        }
+
+        if (linesByPrinter.isEmpty()) {
+            logger.info("No printable lines for tableId={}", tableId);
+            return;
+        }
+
+        String kellner = orderItem != null ? orderItem.getKellner() : "";
+
+        for (Map.Entry<Integer, List<OrderLine>> entry : linesByPrinter.entrySet()) {
+            int printerIndex = entry.getKey();
+            List<OrderLine> lines = entry.getValue();
+            String printerName = printerNames.get(printerIndex);
+            if (printerName == null || printerName.isBlank()) {
+                logger.warn("No printer configured for index={} — skipping {} lines for tableId={}",
+                        printerIndex, lines.size(), tableId);
+                continue;
+            }
+
+            PrintService printService = findPrintService(printerName);
+            if (printService == null) {
+                logger.warn("PrintService '{}' not found — skipping printer index={} for tableId={}",
+                        printerName, printerIndex, tableId);
+                continue;
+            }
+
+            logger.info("Printing ticket for tableId={}, printer index={} ('{}'), lines={}",
+                    tableId, printerIndex, printerName, lines.size());
+            printTicketForLines(tableId, tableName, kellner, lines, printService, printerName);
+        }
+    }
+
+    private void printTicketForLines(String tableId, String tableName, String kellner,
+            List<OrderLine> lines, PrintService printService, String printerName) {
         try {
             if (isPdfPrintService(printService)) {
-                String content = buildPlainTicket(tableName, orderItem);
+                String content = buildPlainTicket(tableName, kellner, lines);
                 if (content.isBlank()) {
-                    logger.info("Ticket content is empty for tableId={}, skipping PDF print", tableId);
+                    logger.info("Ticket content is empty for tableId={} on printer '{}', skipping", tableId, printerName);
                     return;
                 }
                 printPlainText(printService, content);
@@ -85,11 +116,8 @@ public class TicketPrintService {
             printer.printText(0, "Tisch: " + tableName);
             printer.printText(0, LocalDateTime.now().format(TIMESTAMP));
             printer.printText(0, DIVIDER);
-            orderItem.getLines().forEach(line -> {
+            for (OrderLine line : lines) {
                 int qty = (int) line.getNewQty();
-                if (qty == 0) {
-                    return;
-                }
                 String name = line.getProductName() != null ? line.getProductName() : "";
                 try {
                     printer.printText(0, qty + "x  " + name);
@@ -100,14 +128,13 @@ public class TicketPrintService {
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
-            });
+            }
             printer.printText(0, DIVIDER);
             printer.endReceipt();
-            logger.debug("Receipt ended for tableId={}, closing writer", tableId);
             writer.close();
             logger.info("Ticket printed for tableId={} on printer '{}'", tableId, printerName);
         } catch (Exception e) {
-            logger.warn("Ticket print failed for tableId={}: {}", tableId, e.getMessage(), e);
+            logger.warn("Ticket print failed for tableId={} on printer '{}': {}", tableId, printerName, e.getMessage(), e);
         }
     }
 
@@ -132,27 +159,26 @@ public class TicketPrintService {
         return false;
     }
 
-    private String buildPlainTicket(String tableName, @NonNull OrderItem orderItem) {
+    private String buildPlainTicket(String tableName, String kellner, List<OrderLine> lines) {
         StringBuilder sb = new StringBuilder();
         StringBuilder sbLines = new StringBuilder();
 
-        if (orderItem != null && orderItem.getLines() != null) {
-            orderItem.getLines().forEach(line -> {
-                int qty = (int) line.getNewQty();
-                if (qty == 0) {
-                    return;
-                }
-                String name = line.getProductName() != null ? line.getProductName() : "";
-                sbLines.append(qty).append("x  ").append(name).append(System.lineSeparator());
-                String att = line.getAttSetInstDesc();
-                if (att != null && !att.isBlank()) {
-                    sbLines.append("    [").append(att.trim()).append(']').append(System.lineSeparator());
-                }
-            });
+        for (OrderLine line : lines) {
+            int qty = (int) line.getNewQty();
+            if (qty == 0) {
+                continue;
+            }
+            String name = line.getProductName() != null ? line.getProductName() : "";
+            sbLines.append(qty).append("x  ").append(name).append(System.lineSeparator());
+            String att = line.getAttSetInstDesc();
+            if (att != null && !att.isBlank()) {
+                sbLines.append("    [").append(att.trim()).append(']').append(System.lineSeparator());
+            }
         }
+
         if (sbLines.length() > 0) {
             sb.append("Tisch: ").append(tableName).append(System.lineSeparator());
-            sb.append("KellnerIn: ").append(orderItem.getKellner()).append(System.lineSeparator());
+            sb.append("KellnerIn: ").append(kellner).append(System.lineSeparator());
             sb.append(LocalDateTime.now().format(TIMESTAMP)).append(System.lineSeparator());
             sb.append(DIVIDER).append(System.lineSeparator());
             sb.append(sbLines);
@@ -239,9 +265,28 @@ public class TicketPrintService {
         }
     }
 
-    private String queryPrinterName() {
-        // get printer from config
-        return W4cashApplication.APP_CONFIG.getProperty("machine.printer");
+    private Map<Integer, String> queryPrinterNames() {
+        var printersConfig = new HashMap<Integer, String>();
+        printersConfig.put(1, W4cashApplication.APP_CONFIG.getProperty("machine.printer"));
+        printersConfig.put(2, W4cashApplication.APP_CONFIG.getProperty("machine.printer.2"));
+        printersConfig.put(3, W4cashApplication.APP_CONFIG.getProperty("machine.printer.3"));
+        return printersConfig;
+    }
+
+    private int queryPrinterIndexForProduct(String productId) {
+        try (PreparedStatement st = LoadDatabase.DBConnection.prepareStatement(
+                "SELECT c.PRINTER FROM PRODUCTS p JOIN CATEGORIES c ON p.CATEGORY = c.ID WHERE p.ID = ?")) {
+            st.setString(1, productId);
+            try (ResultSet rs = st.executeQuery()) {
+                if (rs.next()) {
+                    int p = rs.getInt("PRINTER");
+                    return p > 0 ? p : 1;
+                }
+            }
+        } catch (SQLException e) {
+            logger.warn("Could not query printer index for productId={}: {}", productId, e.getMessage());
+        }
+        return 1;
     }
 
     private String queryTableName(String tableId) {
@@ -263,7 +308,7 @@ public class TicketPrintService {
         if (name.contains(":")) {
             name = name.split(":", 2)[1].trim();
         }
-        name = name.split(",")[0].trim(); // remove any suffix after comma
+        name = name.split(",")[0].trim();
         for (PrintService service : PrintServiceLookup.lookupPrintServices(null, null)) {
             if (service.getName().equalsIgnoreCase(name)) {
                 return service;

@@ -16,6 +16,7 @@ class Category {
     private String id_;
     private String name;
     private String parentId;
+    private int printer = 1;
     @Transient
     private List<Category> children;
 
@@ -26,6 +27,13 @@ class Category {
         this.id_ = id_;
         this.name = name;
         this.parentId = parentId;
+    }
+
+    public Category(String id_, String name, String parentId, int printer) {
+        this.id_ = id_;
+        this.name = name;
+        this.parentId = parentId;
+        this.printer = printer;
     }
 
     public Long getId() {
@@ -58,7 +66,14 @@ class Category {
 
     public void setParentId(String parentId) {
         this.parentId = parentId;
+    }
 
+    public int getPrinter() {
+        return printer;
+    }
+
+    public void setPrinter(int printer) {
+        this.printer = printer;
     }
 
     public List<Category> getChildren() {
@@ -81,17 +96,18 @@ class Category {
             return false;
         Category category = (Category) o;
         return Objects.equals(this.id, category.id) && Objects.equals(this.id_, category.id_)
-                && Objects.equals(this.name, category.name) && Objects.equals(this.parentId, category.parentId);
+                && Objects.equals(this.name, category.name) && Objects.equals(this.parentId, category.parentId)
+                && this.printer == category.printer;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.id, this.id_, this.name, this.parentId);
+        return Objects.hash(this.id, this.id_, this.name, this.parentId, this.printer);
     }
 
     @Override
     public String toString() {
         return "Category {" + "id=" + this.id + ", id_='" + this.id_ + '\'' + ", name='" + this.name + '\''
-                + ", parentId='" + this.parentId + '\'' + '}';
+                + ", parentId='" + this.parentId + '\'' + ", printer=" + this.printer + '}';
     }
 }
