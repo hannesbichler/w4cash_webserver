@@ -2,102 +2,112 @@ package w4cash.floors;
 
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
 
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import w4cash.LoadDatabase;
 
-// tag::hateoas-imports[]
-// end::hateoas-imports[]
-
 @RestController
 class FloorController {
 
-	private final FloorRepository repository;
+	private static final Logger logger = LoggerFactory.getLogger(FloorController.class);
 
-	FloorController(FloorRepository repository) {
+	private final FloorsRepository repository;
+
+	FloorController(FloorsRepository repository) {
 		this.repository = repository;
 	}
 
-	// Aggregate root
-
-	// tag::get-aggregate-root[]
+	// Reads FLOORS straight through. This used to wipe and repopulate a JPA
+	// mirror in in-memory H2 on every call, which meant two concurrent requests
+	// could each observe the other's half-built table.
 	@GetMapping("/floors")
 	CollectionModel<EntityModel<Floor>> all() {
 		List<EntityModel<Floor>> floors = new ArrayList<>();
-		try (PreparedStatement st = LoadDatabase.DBConnection
-				.prepareStatement("SELECT ID, NAME FROM FLOORS");
+		try (Connection conn = LoadDatabase.getConnection();
+				PreparedStatement st = conn.prepareStatement(
+						"SELECT ID, NAME, SORTORDER FROM FLOORS ORDER BY SORTORDER NULLS LAST, NAME");
 				ResultSet rs = st.executeQuery()) {
-			repository.deleteAll();
 			while (rs.next()) {
-				String id = rs.getString("ID");
-				String name = rs.getString("NAME");
-				this.repository.save(new Floor(id, name));
+				int sortOrder = rs.getInt("SORTORDER");
+				floors.add(EntityModel.of(new Floor(
+						rs.getString("ID"),
+						rs.getString("NAME"),
+						rs.wasNull() ? null : sortOrder)));
 			}
-			floors = repository.findAll().stream()
-					.map(floor -> EntityModel.of(floor// ,
-					// linkTo(methodOn(FloorController.class).one(floor.getId())).withSelfRel(),
-					// linkTo(methodOn(FloorController.class).all()).withRel("floors")
-					))
-					.collect(Collectors.toList());
 		} catch (SQLException e) {
-			e.printStackTrace();
-			// TODO: handle exception
+			logger.error("Failed to load floors", e);
 		}
 
 		return CollectionModel.of(floors, linkTo(methodOn(FloorController.class).all()).withSelfRel());
 	}
-	// end::get-aggregate-root[]
 
-	// @PostMapping("/employees")
-	// Product newEmployee(@RequestBody Product newEmployee) {
-	// return repository.save(newEmployee);
-	// }
-
-	// Single item
-
-	// tag::get-single-item[]
-	@GetMapping("/floor/{id}")
-	EntityModel<Floor> one(@PathVariable Long id) {
-
-		Floor floor = repository.findById(id) //
-				.orElseThrow(() -> new FloorNotFoundException(id));
-
-		return EntityModel.of(floor, //
-				linkTo(methodOn(FloorController.class).one(id)).withSelfRel(),
-				linkTo(methodOn(FloorController.class).all()).withRel("floors"));
-	}
-	// end::get-single-item[]
-
-	@PutMapping("/floor/{id}")
-	Floor replaceFloor(@RequestBody Floor newFloor, @PathVariable Long id) {
-
-		return repository.findById(id) //
-				.map(floor -> {
-					floor.setName(newFloor.getName());
-					floor.setId(newFloor.getId());
-					return repository.save(floor);
-				}) //
-				.orElseGet(() -> {
-					return repository.save(newFloor);
-				});
+	@PostMapping("/floors")
+	ResponseEntity<?> create(@RequestBody Floor body) {
+		if (body == null || body.getName() == null || body.getName().isBlank()) {
+			return ResponseEntity.badRequest().body("name is required");
+		}
+		try {
+			return ResponseEntity.status(HttpStatus.CREATED)
+					.body(repository.insert(body.getName().trim(), body.getSortOrder()));
+		} catch (SQLException e) {
+			logger.error("Failed to create floor", e);
+			return ResponseEntity.internalServerError().body("Failed to create floor: " + e.getMessage());
+		}
 	}
 
-	@DeleteMapping("/floor/{id}")
-	void deleteFloor(@PathVariable Long id) {
-		repository.deleteById(id);
+	@PutMapping("/floors/{id}")
+	ResponseEntity<?> update(@PathVariable String id, @RequestBody Floor body) {
+		if (body == null || body.getName() == null || body.getName().isBlank()) {
+			return ResponseEntity.badRequest().body("name is required");
+		}
+		try {
+			if (!repository.update(id, body.getName().trim(), body.getSortOrder())) {
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No floor with id=" + id);
+			}
+			body.setId_(id);
+			return ResponseEntity.ok(body);
+		} catch (SQLException e) {
+			logger.error("Failed to update floor id={}", id, e);
+			return ResponseEntity.internalServerError().body("Failed to update floor: " + e.getMessage());
+		}
+	}
+
+	@DeleteMapping("/floors/{id}")
+	ResponseEntity<?> delete(@PathVariable String id) {
+		try {
+			if (!repository.exists(id)) {
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No floor with id=" + id);
+			}
+			// PLACES.FLOOR references this row, so name the blocker instead of letting
+			// PLACES_FK_1 surface as a 500.
+			int places = repository.countPlaces(id);
+			if (places > 0) {
+				return ResponseEntity.status(HttpStatus.CONFLICT).body("Floor still has " + places + " tables");
+			}
+			repository.deleteById(id);
+			return ResponseEntity.noContent().build();
+		} catch (SQLException e) {
+			logger.error("Failed to delete floor id={}", id, e);
+			return ResponseEntity.internalServerError().body("Failed to delete floor: " + e.getMessage());
+		}
 	}
 }

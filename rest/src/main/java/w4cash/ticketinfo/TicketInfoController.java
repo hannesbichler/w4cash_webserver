@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -20,11 +21,15 @@ import java.util.stream.Collectors;
 import javax.print.PrintService;
 import javax.print.PrintServiceLookup;
 
+import java.util.Map;
+
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -46,47 +51,63 @@ import w4cash.print.TicketPrintService;
 class TicketInfoController {
 	private static final Logger logger = LoggerFactory.getLogger(TicketInfoController.class);
 
-	private final SharedTicketRepository repository;
 	private final TicketPrintService ticketPrintService;
 
-	TicketInfoController(SharedTicketRepository repository, TicketPrintService ticketPrintService) {
-		this.repository = repository;
+	TicketInfoController(TicketPrintService ticketPrintService) {
 		this.ticketPrintService = ticketPrintService;
 	}
 
 	// Aggregate root
 
 	// tag::get-aggregate-root[]
+	// Reads SHAREDTICKETS straight through. This used to wipe and repopulate a
+	// JPA mirror in in-memory H2 on every call, which meant two concurrent
+	// requests could each observe the other's half-built table.
 	@GetMapping("/TicketInfos")
 	CollectionModel<EntityModel<SharedTicket>> all() {
 		List<EntityModel<SharedTicket>> sharedTickets = new ArrayList<>();
-		try (PreparedStatement st = LoadDatabase.DBConnection
-				.prepareStatement("SELECT ID, NAME FROM SHAREDTICKETS");
+		try (Connection conn = LoadDatabase.getConnection();
+				PreparedStatement st = conn.prepareStatement("SELECT ID, NAME FROM SHAREDTICKETS");
 				ResultSet rs = st.executeQuery()) {
-			repository.deleteAll();
 			while (rs.next()) {
-				String id = rs.getString("ID");
-				String name = HtmlUtils.htmlEscape(rs.getString("NAME"));
-				this.repository.save(new SharedTicket(id, name));
+				sharedTickets.add(EntityModel.of(new SharedTicket(
+						rs.getString("ID"),
+						HtmlUtils.htmlEscape(rs.getString("NAME")))));
 			}
-			sharedTickets = repository.findAll().stream()
-					.map(sharedTicket -> EntityModel.of(sharedTicket// ,
-					// linkTo(methodOn(TicketInfoController.class).one(sharedTicket.getId())).withSelfRel(),
-					// linkTo(methodOn(TicketInfoController.class).all()).withRel("sharedTickets")
-					))
-					.collect(Collectors.toList());
 		} catch (SQLException e) {
-			e.printStackTrace();
+			logger.error("Failed to load shared tickets", e);
 		}
 
 		return CollectionModel.of(sharedTickets, linkTo(methodOn(TicketInfoController.class).all()).withSelfRel());
 	}
 	// end::get-aggregate-root[]
 
-	// @PostMapping("/employees")
-	// Product newEmployee(@RequestBody Product newEmployee) {
-	// return repository.save(newEmployee);
-	// }
+	record TableTicket(String tableId, String tableName, String lockby, List<OrderLine> lines) {
+	}
+
+	@GetMapping("/orderitems")
+	List<TableTicket> allOrderItems() {
+		List<TableTicket> result = new ArrayList<>();
+		try (Connection conn = LoadDatabase.getConnection();
+				PreparedStatement st = conn
+				.prepareStatement("SELECT ID, NAME, CONTENT, LOCKBY FROM SHAREDTICKETS");
+				ResultSet rs = st.executeQuery()) {
+			while (rs.next()) {
+				String id = rs.getString("ID");
+				String name = HtmlUtils.htmlEscape(rs.getString("NAME"));
+				byte[] content = rs.getBytes("CONTENT");
+				String lockby = rs.getString("LOCKBY");
+				OrderItem item = decodeContent(content);
+				if (item.getLines().isEmpty()) {
+					continue;
+				}
+				result.add(new TableTicket(id, name, lockby != null ? lockby : "", item.getLines()));
+			}
+		} catch (SQLException e) {
+			logger.error("Failed to fetch all order items", e);
+		}
+		return result;
+	}
 
 	// Single item
 
@@ -104,7 +125,8 @@ class TicketInfoController {
 				continue;
 			}
 
-			try (PreparedStatement st = LoadDatabase.DBConnection
+			try (Connection conn = LoadDatabase.getConnection();
+					PreparedStatement st = conn
 					.prepareStatement("SELECT ID, value FROM ATTRIBUTEVALUE where value = ?")) {
 				st.setString(1, entry);
 				ResultSet rs = st.executeQuery();
@@ -223,7 +245,8 @@ class TicketInfoController {
 		logger.info("GET /orderitem request was called for tableId={}, tableName={}, lockby={}", tableId, tableName,
 				lockby);
 		SharedTicket sharedTicket = null;
-		try (PreparedStatement st = LoadDatabase.DBConnection
+		try (Connection conn = LoadDatabase.getConnection();
+				PreparedStatement st = conn
 				.prepareStatement("SELECT ID, NAME, CONTENT, LOCKBY FROM SHAREDTICKETS where ID = ?")) {
 			st.setString(1, tableId);
 			try (ResultSet rs = st.executeQuery()) {
@@ -250,7 +273,8 @@ class TicketInfoController {
 			// update lockby in sharedtickets table if it is null or different from the
 			// current lockby
 			if (sharedTicket.getLockby() == null || !sharedTicket.getLockby().equals(lockby)) {
-				try (PreparedStatement updateSt = LoadDatabase.DBConnection
+				try (Connection conn = LoadDatabase.getConnection();
+						PreparedStatement updateSt = conn
 						.prepareStatement("UPDATE SHAREDTICKETS SET LOCKBY = ? where ID = ?")) {
 					updateSt.setString(1, lockby);
 					updateSt.setString(2, tableId);
@@ -270,7 +294,8 @@ class TicketInfoController {
 			var ticketinfo = new TicketInfo();
 			byte[] content = encodeContent(ticketinfo);
 			// Add a new empty shared ticket row for this table on first access.
-			try (PreparedStatement insertSt = LoadDatabase.DBConnection
+			try (Connection conn = LoadDatabase.getConnection();
+					PreparedStatement insertSt = conn
 					.prepareStatement("INSERT INTO SHAREDTICKETS (ID, NAME, CONTENT, LOCKBY) VALUES (?, ?, ?, ?)")) {
 				insertSt.setString(1, tableId);
 				insertSt.setString(2, tableName);
@@ -309,7 +334,8 @@ class TicketInfoController {
 				// proinfoext.setAttributeSetID(line.getAttSetInstDesc());
 
 				// get all infos from product
-				try (PreparedStatement st = LoadDatabase.DBConnection
+				try (Connection conn = LoadDatabase.getConnection();
+						PreparedStatement st = conn
 						.prepareStatement(
 								"SELECT ID, REFERENCE, CODE, NAME, PRICEBUY, PRICESELL, TAXCAT, CATEGORY, ATTRIBUTESET_ID, BGCOLOR, UNIT "
 										+ "FROM PRODUCTS WHERE ID = ?")) {
@@ -340,7 +366,8 @@ class TicketInfoController {
 		}
 		if (ticketInfo.getLines() == null || ticketInfo.getLines().isEmpty()) {
 			// remove it from sharedtickets table
-			try (PreparedStatement st = LoadDatabase.DBConnection
+			try (Connection conn = LoadDatabase.getConnection();
+					PreparedStatement st = conn
 					.prepareStatement("DELETE FROM SHAREDTICKETS where ID = ?")) {
 				st.setString(1, id);
 				st.executeUpdate();
@@ -349,7 +376,8 @@ class TicketInfoController {
 			}
 		} else {
 			byte[] content = encodeContent(ticketInfo);
-			try (PreparedStatement st = LoadDatabase.DBConnection
+			try (Connection conn = LoadDatabase.getConnection();
+					PreparedStatement st = conn
 					.prepareStatement("UPDATE SHAREDTICKETS SET CONTENT = ?, LOCKBY = ? where ID = ?")) {
 				st.setBytes(1, content);
 				st.setString(2, newOrderItem.getLockby());
@@ -363,10 +391,96 @@ class TicketInfoController {
 		return newOrderItem;
 	}
 
+	@PostMapping("/orderitem/{fromId}/move-table")
+	ResponseEntity<String> moveTable(@PathVariable String fromId, @RequestBody Map<String, String> body) {
+		String toId = body.get("toPlaceId");
+		if (toId == null || toId.isBlank()) {
+			return ResponseEntity.badRequest().body("toPlaceId required");
+		}
+
+		// One connection for the whole move. NOTE: still not a transaction -- a
+		// failure between writing the target and clearing the source duplicates the
+		// ticket, and two concurrent moves into the same target lose one. Making
+		// this atomic is a separate fix.
+		try (Connection conn = LoadDatabase.getConnection()) {
+
+			// Fetch source ticket content
+			byte[] content = null;
+			String lockby = null;
+			try (PreparedStatement st = conn.prepareStatement(
+					"SELECT CONTENT, LOCKBY FROM SHAREDTICKETS WHERE ID = ?")) {
+				st.setString(1, fromId);
+				try (ResultSet rs = st.executeQuery()) {
+					if (rs.next()) {
+						content = rs.getBytes("CONTENT");
+						lockby = rs.getString("LOCKBY");
+					}
+				}
+			} catch (SQLException e) {
+				logger.error("move-table: failed to fetch source for fromId={}", fromId, e);
+				return ResponseEntity.internalServerError().body("Failed to read source ticket");
+			}
+
+			if (content == null) {
+				return ResponseEntity.notFound().build();
+			}
+
+			// Resolve target table name from PLACES
+			String toName = toId;
+			try (PreparedStatement st = conn.prepareStatement(
+					"SELECT NAME FROM PLACES WHERE ID = ?")) {
+				st.setString(1, toId);
+				try (ResultSet rs = st.executeQuery()) {
+					if (rs.next())
+						toName = rs.getString("NAME");
+				}
+			} catch (SQLException e) {
+				logger.warn("move-table: could not resolve target name for toId={}", toId, e);
+			}
+
+			// Write content to target (update or insert)
+			try (PreparedStatement upd = conn.prepareStatement(
+					"UPDATE SHAREDTICKETS SET CONTENT = ?, LOCKBY = ? WHERE ID = ?")) {
+				upd.setBytes(1, content);
+				upd.setString(2, lockby);
+				upd.setString(3, toId);
+				if (upd.executeUpdate() == 0) {
+					try (PreparedStatement ins = conn.prepareStatement(
+							"INSERT INTO SHAREDTICKETS (ID, NAME, CONTENT, LOCKBY) VALUES (?, ?, ?, ?)")) {
+						ins.setString(1, toId);
+						ins.setString(2, toName);
+						ins.setBytes(3, content);
+						ins.setString(4, lockby);
+						ins.executeUpdate();
+					}
+				}
+			} catch (SQLException e) {
+				logger.error("move-table: failed to write target for toId={}", toId, e);
+				return ResponseEntity.internalServerError().body("Failed to write target ticket");
+			}
+
+			// Clear source
+			try (PreparedStatement st = conn.prepareStatement(
+					"DELETE FROM SHAREDTICKETS WHERE ID = ?")) {
+				st.setString(1, fromId);
+				st.executeUpdate();
+			} catch (SQLException e) {
+				logger.warn("move-table: failed to delete source for fromId={}", fromId, e);
+			}
+		} catch (SQLException e) {
+			logger.error("move-table: no database connection for fromId={}", fromId, e);
+			return ResponseEntity.internalServerError().body("Failed to move ticket");
+		}
+
+		logger.info("move-table: moved ticket from {} to {}", fromId, toId);
+		return ResponseEntity.ok("moved");
+	}
+
 	// not used any more, but kept for reference
 	@DeleteMapping("/orderitem/{id}")
 	void deleteOrderItem(@PathVariable String id) {
-		try (PreparedStatement st = LoadDatabase.DBConnection
+		try (Connection conn = LoadDatabase.getConnection();
+				PreparedStatement st = conn
 				.prepareStatement("DELETE FROM SHAREDTICKETS where ID = ?")) {
 			st.setString(1, id);
 			st.executeUpdate();
@@ -376,7 +490,8 @@ class TicketInfoController {
 	}
 
 	void printAllPrinters() {
-		try (PreparedStatement st = LoadDatabase.DBConnection.prepareStatement("SELECT ID, NAME FROM PRINTERS");
+		try (Connection conn = LoadDatabase.getConnection();
+				PreparedStatement st = conn.prepareStatement("SELECT ID, NAME FROM PRINTERS");
 				ResultSet rs = st.executeQuery()) {
 			while (rs.next()) {
 				String id = rs.getString("ID");
@@ -401,8 +516,4 @@ class TicketInfoController {
 		}
 	}
 
-	@DeleteMapping("/TicketInfo/{id}")
-	void deleteTicketInfo(@PathVariable Long id) {
-		repository.deleteById(id);
-	}
 }

@@ -1,5 +1,6 @@
 package w4cash.auth;
 
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.Map;
@@ -31,9 +32,10 @@ public class OtpController {
 
     @EventListener(ApplicationReadyEvent.class)
     public void logSamplePhone() {
-        try (PreparedStatement st = LoadDatabase.DBConnection.prepareStatement(
-                "SELECT NAME, CARD FROM PEOPLE WHERE CARD IS NOT NULL AND CARD <> '' LIMIT 1");
-             ResultSet rs = st.executeQuery()) {
+        try (Connection conn = LoadDatabase.getConnection();
+        		PreparedStatement st = conn.prepareStatement(
+                "SELECT NAME, CARD FROM PEOPLE WHERE CARD IS NOT NULL AND CARD <> ''");
+                ResultSet rs = st.executeQuery()) {
             if (rs.next()) {
                 logger.info("Sample phone for OTP testing — user: '{}', card/phone: '{}'",
                         rs.getString("NAME"), rs.getString("CARD"));
@@ -43,7 +45,10 @@ public class OtpController {
         }
     }
 
-    /** Send OTP to the given phone number. Returns 404 if no person has that card value. */
+    /**
+     * Send OTP to the given phone number. Returns 404 if no person has that card
+     * value.
+     */
     @PostMapping("/send")
     ResponseEntity<Map<String, String>> send(@RequestBody Map<String, String> body) {
         String phone = body.get("phone");
@@ -74,17 +79,18 @@ public class OtpController {
     }
 
     private Optional<Map<String, String>> findPersonByCard(String card) {
-        try (PreparedStatement st = LoadDatabase.DBConnection.prepareStatement(
+        try (Connection conn = LoadDatabase.getConnection();
+        		PreparedStatement st = conn.prepareStatement(
                 "SELECT ID, NAME, APPPASSWORD, CARD, ROLE FROM PEOPLE WHERE CARD = ?")) {
             st.setString(1, card);
             try (ResultSet rs = st.executeQuery()) {
                 if (rs.next()) {
                     return Optional.of(Map.of(
-                            "id_",         rs.getString("ID"),
-                            "name",        rs.getString("NAME"),
+                            "id_", rs.getString("ID"),
+                            "name", rs.getString("NAME"),
                             "apppassword", rs.getString("APPPASSWORD") != null ? rs.getString("APPPASSWORD") : "",
-                            "card",        rs.getString("CARD") != null ? rs.getString("CARD") : "",
-                            "role",        rs.getString("ROLE") != null ? rs.getString("ROLE") : ""));
+                            "card", rs.getString("CARD") != null ? rs.getString("CARD") : "",
+                            "role", rs.getString("ROLE") != null ? rs.getString("ROLE") : ""));
                 }
             }
         } catch (Exception e) {

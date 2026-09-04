@@ -2,14 +2,12 @@ package w4cash.ticketinfo;
 
 import java.util.Objects;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.GeneratedValue;
-
-@Entity
+/**
+ * A row of the Oracle SHAREDTICKETS table. Was a JPA entity mirrored into
+ * in-memory H2; now just a carrier between the query and the response.
+ */
 class SharedTicket {
 
-    private @Id @GeneratedValue Long id;
     private String m_sId;
     private String m_name;
     private byte[] m_content;
@@ -28,10 +26,6 @@ class SharedTicket {
         this.m_name = name;
         this.m_content = content;
         this.m_lockby = lockby;
-    }
-
-    public Long getId() {
-        return id;
     }
 
     public String getSId() {

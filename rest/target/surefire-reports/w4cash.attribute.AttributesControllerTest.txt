@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: w4cash.attribute.AttributesControllerTest
+-------------------------------------------------------------------------------
+Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.937 s -- in w4cash.attribute.AttributesControllerTest

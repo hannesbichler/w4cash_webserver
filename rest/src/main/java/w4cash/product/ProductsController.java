@@ -2,123 +2,97 @@ package w4cash.product;
 
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.util.HtmlUtils;
-
-import w4cash.LoadDatabase;
-
-// tag::hateoas-imports[]
-// end::hateoas-imports[]
 
 @RestController
 class ProductsController {
 
+	private static final Logger logger = LoggerFactory.getLogger(ProductsController.class);
 	private final ProductsRepository repository;
 
 	ProductsController(ProductsRepository repository) {
 		this.repository = repository;
 	}
 
-	// Aggregate root
-	// tag::get-aggregate-root[]
 	@GetMapping("/products")
-	CollectionModel<EntityModel<Product>> all() {
-		List<EntityModel<Product>> products = new ArrayList<>();
-		try (PreparedStatement st = LoadDatabase.DBConnection
-				.prepareStatement(
-						"SELECT ID, CODE, NAME, PRICESELL, CATEGORY, ATTRIBUTESET_ID FROM PRODUCTS")) {
-			try (ResultSet rs = st.executeQuery()) {
-				repository.deleteAll();
-				while (rs.next()) {
-					String id = rs.getString("ID");
-					String code = HtmlUtils.htmlEscape(rs.getString("CODE"));
-					String name = HtmlUtils.htmlEscape(rs.getString("NAME"));
-					float pricesell = rs.getFloat("PRICESELL");
-					String categoryId = rs.getString("CATEGORY");
-					String attributeSetId = rs.getString("ATTRIBUTESET_ID");
-					this.repository.save(new Product(id, code, name, pricesell, categoryId, attributeSetId));
-				}
-			}
-			products = repository.findAll().stream()
-					.map(product -> EntityModel.of(product))
+	ResponseEntity<?> all(@RequestParam(required = false) String categoryId) {
+		logger.info("GET /products request was called, categoryId={}", categoryId);
+		try {
+			List<EntityModel<Product>> products = repository.findAll(categoryId).stream()
+					.map(EntityModel::of)
 					.collect(Collectors.toList());
+			return ResponseEntity.ok(
+					CollectionModel.of(products, linkTo(methodOn(ProductsController.class).all(categoryId)).withSelfRel()));
 		} catch (SQLException e) {
-			// TODO: handle exception
+			logger.error("Failed to load products, categoryId={}", categoryId, e);
+			return ResponseEntity.internalServerError().body("Failed to load products");
 		}
-
-		return CollectionModel.of(products, linkTo(methodOn(ProductsController.class).all()).withSelfRel());
 	}
 
-	// tag::get-aggregate-root[]
-	@GetMapping("/products/{categoryId}")
-	CollectionModel<EntityModel<Product>> all(@PathVariable String categoryId) {
-		List<EntityModel<Product>> products = new ArrayList<>();
-		try (PreparedStatement st = LoadDatabase.DBConnection
-				.prepareStatement(
-						"SELECT ID, CODE, NAME, PRICESELL, CATEGORY, ATTRIBUTESET_ID FROM PRODUCTS where CATEGORY = ?")) {
-			st.setString(1, categoryId);
-			try (ResultSet rs = st.executeQuery()) {
-				repository.deleteAll();
-				while (rs.next()) {
-					String id = rs.getString("ID");
-					String code = HtmlUtils.htmlEscape(rs.getString("CODE"));
-					String name = HtmlUtils.htmlEscape(rs.getString("NAME"));
-					float pricesell = rs.getFloat("PRICESELL");
-					String attributeSetId = rs.getString("ATTRIBUTESET_ID");
-					this.repository.save(new Product(id, code, name, pricesell, categoryId, attributeSetId));
-				}
+	@GetMapping("/products/{id}")
+	ResponseEntity<?> one(@PathVariable String id) {
+		try {
+			return repository.findById(id)
+					.<ResponseEntity<?>>map(ResponseEntity::ok)
+					.orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body("No product with id=" + id));
+		} catch (SQLException e) {
+			logger.error("Failed to load product id={}", id, e);
+			return ResponseEntity.internalServerError().body("Failed to load product");
+		}
+	}
+
+	@PostMapping("/products")
+	ResponseEntity<?> create(@RequestBody Product newProduct) {
+		try {
+			Product saved = repository.insert(newProduct);
+			return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+		} catch (SQLException e) {
+			logger.error("Failed to create product", e);
+			return ResponseEntity.internalServerError().body("Failed to create product: " + e.getMessage());
+		}
+	}
+
+	@PutMapping("/products/{id}")
+	ResponseEntity<?> update(@PathVariable String id, @RequestBody Product updatedProduct) {
+		try {
+			if (!repository.update(id, updatedProduct)) {
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No product with id=" + id);
 			}
-			products = repository.findAll().stream()
-					.map(product -> EntityModel.of(product))
-					.collect(Collectors.toList());
+			updatedProduct.setId(id);
+			return ResponseEntity.ok(updatedProduct);
 		} catch (SQLException e) {
-			// TODO: handle exception
+			logger.error("Failed to update product id={}", id, e);
+			return ResponseEntity.internalServerError().body("Failed to update product: " + e.getMessage());
 		}
-
-		return CollectionModel.of(products, linkTo(methodOn(ProductsController.class).all(categoryId)).withSelfRel());
-	}
-
-	// tag::get-single-item[]
-	@GetMapping("/product/{id}")
-	EntityModel<Product> one(@PathVariable Long id) {
-
-		Product product = repository.findById(id) //
-				.orElseThrow(() -> new ProductNotFoundException(id));
-
-		return EntityModel.of(product);
-	}
-	// end::get-single-item[]
-
-	@PutMapping("/product/{id}")
-	Product replaceEmployee(@RequestBody Product newProduct, @PathVariable Long id) {
-
-		return repository.findById(id) //
-				.map(product -> {
-					product.setName(newProduct.getName());
-					product.setCategoryId(newProduct.getCategoryId());
-					return repository.save(product);
-				}) //
-				.orElseGet(() -> {
-					return repository.save(newProduct);
-				});
 	}
 
 	@DeleteMapping("/products/{id}")
-	void deleteProduct(@PathVariable Long id) {
-		repository.deleteById(id);
+	ResponseEntity<?> delete(@PathVariable String id) {
+		try {
+			if (!repository.deleteById(id)) {
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No product with id=" + id);
+			}
+			return ResponseEntity.noContent().build();
+		} catch (SQLException e) {
+			logger.error("Failed to delete product id={}", id, e);
+			return ResponseEntity.internalServerError().body("Failed to delete product: " + e.getMessage());
+		}
 	}
 }

@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(ng version *)",
+      "Bash(ng new *)",
+      "Bash(node -e ' *)",
+      "Bash(ng build *)",
+      "Bash(./mvnw -pl rest compile -q)",
+      "PowerShell($jar = \"$env:USERPROFILE\\\\.m2\\\\repository\\\\org\\\\jfree\\\\jcommon\\\\1.0.24\\\\jcommon-1.0.24.jar\"; Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::OpenRead\\($jar\\).Entries | Where-Object FullName -eq 'org/jfree/util/Log.class' | Select-Object -ExpandProperty FullName)",
+      "PowerShell($jdk = Split-Path \\(Get-Command javac\\).Source; cd \"C:\\\\Users\\\\hbich\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--BTech-java-w4cash-webserver\\\\1f81886d-1d1f-483c-a0ea-13110bd763d7\\\\scratchpad\"; & \"$jdk\\\\java.exe\" WrapCheck)",
+      "PowerShell(Set-Content *)",
+      "Bash(./mvnw -pl rest compile)",
+      "Bash(python \"C:/Users/hbich/AppData/Local/Temp/claude/C--BTech-java-w4cash-webserver/71aacd79-fef0-4b5c-944f-ed826d14fcd7/scratchpad/migrate_tests.py\")",
+      "Bash(./mvnw -pl rest test-compile)",
+      "Bash(./mvnw -pl rest test)",
+      "Bash(grep -E \"Tests run:.*\\(Fail|Err\\)|Tests run:$|^\\\\[INFO\\\\] Tests run|BUILD\")",
+      "Bash(grep -E \"Tests run: [0-9]+, Fail.*$|BUILD\")",
+      "Bash(git rm *)",
+      "Bash(rm -f rest/src/main/java/w4cash/places/PlaceRepository.java rest/src/main/java/w4cash/places/PlaceNotFoundException.java rest/src/main/java/w4cash/category/CategoryRepository.java rest/src/main/java/w4cash/category/CategoryNotFoundException.java rest/src/main/java/w4cash/person/PersonRepository.java rest/src/main/java/w4cash/person/PersonNotFoundException.java rest/src/main/java/w4cash/floors/FloorRepository.java rest/src/main/java/w4cash/floors/FloorNotFoundException.java rest/src/main/java/w4cash/ticketinfo/TicketInfoRepository.java rest/src/main/java/w4cash/ticketinfo/TicketInfoNotFoundException.java)",
+      "Bash(python -m http.server 8412)",
+      "Bash(python \"C:/Users/hbich/AppData/Local/Temp/claude/C--BTech-java-w4cash-webserver/71aacd79-fef0-4b5c-944f-ed826d14fcd7/scratchpad/build_preview.py\")",
+      "Artifact"
+    ]
+  }
+}

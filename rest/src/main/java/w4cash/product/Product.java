@@ -1,113 +1,130 @@
 package w4cash.product;
 
-import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
+public class Product {
 
-@Entity
-class Product {
-
-	// id: row.ID, code:row.CODE, name: row.NAME, pricesell: row.PRICESELL,
-	// category: row.CATEGORY
-	private @Id @GeneratedValue Long id;
-	private String id_;
-	private String attributeSetId;
+	private String id;
+	private String reference;
 	private String code;
 	private String name;
-	private float pricesell;
+	private double priceBuy;
+	private double priceSell;
+	private String taxCatId;
 	private String categoryId;
+	private String unit;
+	private String attributeSetId;
+	private boolean active;
 
-	Product() {
+	public Product() {
 	}
 
-	// id, code, name, pricesell, category, attributeSetId
-	Product(String id_, String code, String name, float pricesell, String categoryId, String attributeSetId) {
-		this.id_ = id_;
+	public Product(String id, String reference, String code, String name, double priceBuy, double priceSell,
+			String taxCatId, String categoryId, String unit, String attributeSetId) {
+		this.id = id;
+		this.reference = reference;
 		this.code = code;
 		this.name = name;
-		this.pricesell = pricesell;
+		this.priceBuy = priceBuy;
+		this.priceSell = priceSell;
+		this.taxCatId = taxCatId;
 		this.categoryId = categoryId;
+		this.unit = unit;
 		this.attributeSetId = attributeSetId;
 	}
 
-	public Long getId() {
-		return this.id;
+	// serialized as "id_" for compatibility with existing REST consumers (e.g. OrderItemPerformanceTest)
+	@JsonProperty("id_")
+	public String getId() {
+		return id;
 	}
 
-	public String getId_() {
-		return this.id_;
-	}
-
-	public String getAttributeSetId() {
-		return this.attributeSetId;
-	}
-
-	public String getCode() {
-		return this.code;
-	}
-
-	public String getName() {
-		return this.name;
-	}
-
-	public float getPricesell() {
-		return this.pricesell;
-	}
-
-	public String getCategoryId() {
-		return this.categoryId;
-	}
-
-	public void setId(Long id) {
+	public void setId(String id) {
 		this.id = id;
 	}
 
-	public void setId_(String id_) {
-		this.id_ = id_;
+	public String getReference() {
+		return reference;
+	}
+
+	public void setReference(String reference) {
+		this.reference = reference;
+	}
+
+	public String getCode() {
+		return code;
 	}
 
 	public void setCode(String code) {
 		this.code = code;
 	}
 
+	public String getName() {
+		return name;
+	}
+
 	public void setName(String name) {
 		this.name = name;
 	}
 
-	public void setPricesell(float pricesell) {
-		this.pricesell = pricesell;
+	public double getPriceBuy() {
+		return priceBuy;
+	}
+
+	public void setPriceBuy(double priceBuy) {
+		this.priceBuy = priceBuy;
+	}
+
+	// serialized as "pricesell" (no camelCase) for compatibility with existing REST consumers
+	@JsonProperty("pricesell")
+	public double getPriceSell() {
+		return priceSell;
+	}
+
+	public void setPriceSell(double priceSell) {
+		this.priceSell = priceSell;
+	}
+
+	public String getTaxCatId() {
+		return taxCatId;
+	}
+
+	public void setTaxCatId(String taxCatId) {
+		this.taxCatId = taxCatId;
+	}
+
+	public String getCategoryId() {
+		return categoryId;
 	}
 
 	public void setCategoryId(String categoryId) {
 		this.categoryId = categoryId;
 	}
 
+	public String getUnit() {
+		return unit;
+	}
+
+	public void setUnit(String unit) {
+		this.unit = unit;
+	}
+
+	public String getAttributeSetId() {
+		return attributeSetId;
+	}
+
 	public void setAttributeSetId(String attributeSetId) {
 		this.attributeSetId = attributeSetId;
 	}
 
-	@Override
-	public boolean equals(Object o) {
-
-		if (this == o)
-			return true;
-		if (!(o instanceof Product))
-			return false;
-		Product product = (Product) o;
-		return Objects.equals(this.id, product.id) && Objects.equals(this.code, product.code);
+	// "active" is the desktop product editor's catalog flag: a PRODUCTS_CAT row for this
+	// product means it is offered in the POS, no row means it is hidden. There is no ACTIVE
+	// column on PRODUCTS.
+	public boolean isActive() {
+		return active;
 	}
 
-	@Override
-	public int hashCode() {
-		return Objects.hash(this.id, this.code);
-	}
-
-	@Override
-	public String toString() {
-		return "Product{id:" + this.id + ",id_:" + this.id_ + ", name:'" + this.name + "'" + ", category:'"
-				+ this.categoryId + "'" + ", attributeSetId:'" + this.attributeSetId + "'"
-				+ '}';
+	public void setActive(boolean active) {
+		this.active = active;
 	}
 }

@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: w4cash.report.ReportsRepositoryTest
+-------------------------------------------------------------------------------
+Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.732 s -- in w4cash.report.ReportsRepositoryTest

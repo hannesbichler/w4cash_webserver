@@ -2,16 +2,15 @@ package w4cash.person;
 
 import java.util.Objects;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-
-@Entity
+/**
+ * A row of the Oracle PEOPLE table, serialised straight to the client.
+ *
+ * <p>
+ * Was a JPA entity mirrored into in-memory H2; {@code id_} is the real PEOPLE.ID
+ * and is the only identifier clients ever see.
+ */
 class Person {
 
-	// id: row.ID, code:row.CODE, name: row.NAME, pricesell: row.PRICESELL,
-	// category: row.CATEGORY
-	private @Id @GeneratedValue Long id;
 	private String id_;
 	private String name;
 	private String apppassword;
@@ -32,20 +31,12 @@ class Person {
 		this.image = image;
 	}
 
-	public Long getId() {
-		return this.id;
-	}
-
 	public String getId_() {
 		return this.id_;
 	}
 
 	public String getName() {
 		return this.name;
-	}
-
-	public void setId(Long id) {
-		this.id = id;
 	}
 
 	public void setId_(String id_) {
@@ -96,17 +87,17 @@ class Person {
 		if (!(o instanceof Person))
 			return false;
 		Person person = (Person) o;
-		return Objects.equals(this.id, person.id) && Objects.equals(this.name, person.name);
+		return Objects.equals(this.id_, person.id_) && Objects.equals(this.name, person.name);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(this.id, this.name);
+		return Objects.hash(this.id_, this.name);
 	}
 
 	@Override
 	public String toString() {
-		return "Person {" + "id=" + this.id + ", name='" + this.name + '\'' + ", role='" + this.role + '\''
+		return "Person {" + "id_='" + this.id_ + '\'' + ", name='" + this.name + '\'' + ", role='" + this.role + '\''
 				+ '}';
 	}
 }

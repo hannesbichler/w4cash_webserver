@@ -4,20 +4,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Transient;
-
-@Entity
+/**
+ * A row of the Oracle CATEGORIES table, serialised straight to the client.
+ *
+ * <p>
+ * Was a JPA entity mirrored into in-memory H2; {@code id_} is the real
+ * CATEGORIES.ID and is the only identifier clients ever see. {@code children} is
+ * assembled per request by {@code CategoryController}.
+ */
 class Category {
 
-    private @Id @GeneratedValue Long id;
     private String id_;
     private String name;
     private String parentId;
     private int printer = 1;
-    @Transient
     private List<Category> children;
 
     public Category() {
@@ -34,14 +34,6 @@ class Category {
         this.name = name;
         this.parentId = parentId;
         this.printer = printer;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
     }
 
     public String getId_() {
@@ -95,19 +87,19 @@ class Category {
         if (!(o instanceof Category))
             return false;
         Category category = (Category) o;
-        return Objects.equals(this.id, category.id) && Objects.equals(this.id_, category.id_)
+        return Objects.equals(this.id_, category.id_)
                 && Objects.equals(this.name, category.name) && Objects.equals(this.parentId, category.parentId)
                 && this.printer == category.printer;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.id, this.id_, this.name, this.parentId, this.printer);
+        return Objects.hash(this.id_, this.name, this.parentId, this.printer);
     }
 
     @Override
     public String toString() {
-        return "Category {" + "id=" + this.id + ", id_='" + this.id_ + '\'' + ", name='" + this.name + '\''
+        return "Category {" + "id_='" + this.id_ + '\'' + ", name='" + this.name + '\''
                 + ", parentId='" + this.parentId + '\'' + ", printer=" + this.printer + '}';
     }
 }

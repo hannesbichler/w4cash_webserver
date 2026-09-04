@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: w4cash.person.PersonControllerTest
 -------------------------------------------------------------------------------
-Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 10.54 s -- in w4cash.person.PersonControllerTest
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.229 s -- in w4cash.person.PersonControllerTest

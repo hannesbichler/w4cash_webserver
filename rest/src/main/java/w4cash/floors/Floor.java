@@ -2,30 +2,32 @@ package w4cash.floors;
 
 import java.util.Objects;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-
-@Entity
+/**
+ * A row of the Oracle FLOORS table, serialised straight to the client.
+ *
+ * <p>
+ * Was a JPA entity mirrored into in-memory H2; {@code id_} is the real FLOORS.ID
+ * and is the only identifier clients ever see.
+ */
 class Floor {
 
-	// id: row.ID, code:row.CODE, name: row.NAME, pricesell: row.PRICESELL,
-	// category: row.CATEGORY
-	private @Id @GeneratedValue Long id;
 	private String id_;
 	private String name;
+	// FLOORS.SORTORDER, nullable: the position the floor is shown in, unset for older rows.
+	private Integer sortOrder;
 
 	Floor() {
 	}
 
-	// id, code, name, pricesell, category
 	Floor(String id_, String name) {
 		this.id_ = id_;
 		this.name = name;
 	}
 
-	public Long getId() {
-		return this.id;
+	Floor(String id_, String name, Integer sortOrder) {
+		this.id_ = id_;
+		this.name = name;
+		this.sortOrder = sortOrder;
 	}
 
 	public String getId_() {
@@ -36,16 +38,20 @@ class Floor {
 		return this.name;
 	}
 
-	public void setId(Long id) {
-		this.id = id;
-	}
-
 	public void setId_(String id_) {
 		this.id_ = id_;
 	}
 
 	public void setName(String name) {
 		this.name = name;
+	}
+
+	public Integer getSortOrder() {
+		return this.sortOrder;
+	}
+
+	public void setSortOrder(Integer sortOrder) {
+		this.sortOrder = sortOrder;
 	}
 
 	@Override
@@ -56,17 +62,16 @@ class Floor {
 		if (!(o instanceof Floor))
 			return false;
 		Floor floor = (Floor) o;
-		return Objects.equals(this.id, floor.id) && Objects.equals(this.id_, floor.id_)
-				&& Objects.equals(this.name, floor.name);
+		return Objects.equals(this.id_, floor.id_) && Objects.equals(this.name, floor.name);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(this.id, this.id_, this.name);
+		return Objects.hash(this.id_, this.name);
 	}
 
 	@Override
 	public String toString() {
-		return "Floor {" + "id=" + this.id + ", id_='" + this.id_ + '\'' + ", name='" + this.name + '\'' + '}';
+		return "Floor {" + "id_='" + this.id_ + '\'' + ", name='" + this.name + '\'' + '}';
 	}
 }

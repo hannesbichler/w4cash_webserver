@@ -1,27 +1,22 @@
 package w4cash.product;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-
-import w4cash.LoadDatabase;
 
 @WebMvcTest(ProductsController.class)
 class ProductsControllerTest {
@@ -32,30 +27,9 @@ class ProductsControllerTest {
     @MockBean
     ProductsRepository repository;
 
-    private Connection mockConnection;
-    private PreparedStatement mockStatement;
-    private ResultSet mockResultSet;
-
-    @BeforeEach
-    void setUp() throws Exception {
-        mockConnection = mock(Connection.class);
-        mockStatement = mock(PreparedStatement.class);
-        mockResultSet = mock(ResultSet.class);
-
-        LoadDatabase.DBConnection = mockConnection;
-        when(mockConnection.prepareStatement(anyString())).thenReturn(mockStatement);
-        when(mockStatement.executeQuery()).thenReturn(mockResultSet);
-    }
-
-    @AfterEach
-    void tearDown() {
-        LoadDatabase.DBConnection = null;
-    }
-
     @Test
     void getAll_returnsEmptyCollection() throws Exception {
-        when(mockResultSet.next()).thenReturn(false);
-        when(repository.findAll()).thenReturn(List.of());
+        when(repository.findAll(isNull())).thenReturn(List.of());
 
         mockMvc.perform(get("/products"))
                 .andExpect(status().isOk())
@@ -64,95 +38,41 @@ class ProductsControllerTest {
 
     @Test
     void getAll_returnsProducts() throws Exception {
-        when(mockResultSet.next()).thenReturn(true, false);
-        when(mockResultSet.getString("ID")).thenReturn("prod1");
-        when(mockResultSet.getString("CODE")).thenReturn("BURGER");
-        when(mockResultSet.getString("NAME")).thenReturn("Burger");
-        when(mockResultSet.getFloat("PRICESELL")).thenReturn(9.99f);
-        when(mockResultSet.getString("CATEGORY")).thenReturn("cat1");
-        when(mockResultSet.getString("ATTRIBUTESET_ID")).thenReturn(null);
-
-        Product product = new Product("prod1", "BURGER", "Burger", 9.99f, "cat1", null);
-        product.setId(1L);
-        when(repository.findAll()).thenReturn(List.of(product));
+        Product product = new Product("prod1", "REF1", "BURGER", "Burger", 5.00, 9.99, "tax1", "cat1", "unit", "attrset1");
+        when(repository.findAll(isNull())).thenReturn(List.of(product));
 
         mockMvc.perform(get("/products"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$._embedded.*[0].id_").value("prod1"))
                 .andExpect(jsonPath("$._embedded.*[0].name").value("Burger"))
-                .andExpect(jsonPath("$._embedded.*[0].pricesell").value(9.99));
+                .andExpect(jsonPath("$._embedded.*[0].pricesell").value(9.99))
+                .andExpect(jsonPath("$._embedded.*[0].attributeSetId").value("attrset1"));
     }
 
     @Test
-    void getAll_htmlEscapesProductNames() throws Exception {
-        when(mockResultSet.next()).thenReturn(true, false);
-        when(mockResultSet.getString("ID")).thenReturn("prod2");
-        when(mockResultSet.getString("CODE")).thenReturn("<test>");
-        when(mockResultSet.getString("NAME")).thenReturn("Café & Bar");
-        when(mockResultSet.getFloat("PRICESELL")).thenReturn(5.00f);
-        when(mockResultSet.getString("CATEGORY")).thenReturn("cat1");
-        when(mockResultSet.getString("ATTRIBUTESET_ID")).thenReturn(null);
+    void getAll_passesCategoryIdFilterToRepository() throws Exception {
+        when(repository.findAll(eq("drinks"))).thenReturn(List.of());
 
-        when(repository.findAll()).thenReturn(List.of());
+        mockMvc.perform(get("/products").param("categoryId", "drinks"))
+                .andExpect(status().isOk());
 
-        mockMvc.perform(get("/products")).andExpect(status().isOk());
-
-        // Verifies HtmlUtils.htmlEscape was applied before persisting
-        verify(repository).save(argThat(p ->
-                p.getCode().equals("&lt;test&gt;") && p.getName().equals("Caf&eacute; &amp; Bar")));
+        verify(repository).findAll("drinks");
     }
 
     @Test
-    void getAll_syncsDatabaseBeforeReturning() throws Exception {
-        when(mockResultSet.next()).thenReturn(true, false);
-        when(mockResultSet.getString("ID")).thenReturn("prod1");
-        when(mockResultSet.getString("CODE")).thenReturn("COLA");
-        when(mockResultSet.getString("NAME")).thenReturn("Cola");
-        when(mockResultSet.getFloat("PRICESELL")).thenReturn(2.50f);
-        when(mockResultSet.getString("CATEGORY")).thenReturn("drinks");
-        when(mockResultSet.getString("ATTRIBUTESET_ID")).thenReturn(null);
-        when(repository.findAll()).thenReturn(List.of());
+    void getAll_repositoryError_returns500() throws Exception {
+        when(repository.findAll(any())).thenThrow(new SQLException("db down"));
 
-        mockMvc.perform(get("/products")).andExpect(status().isOk());
-
-        verify(repository).deleteAll();
-        verify(repository).save(any(Product.class));
-    }
-
-    @Test
-    void getByCategory_returnsFilteredProducts() throws Exception {
-        when(mockResultSet.next()).thenReturn(true, false);
-        when(mockResultSet.getString("ID")).thenReturn("prod2");
-        when(mockResultSet.getString("CODE")).thenReturn("COLA");
-        when(mockResultSet.getString("NAME")).thenReturn("Cola");
-        when(mockResultSet.getFloat("PRICESELL")).thenReturn(2.50f);
-        when(mockResultSet.getString("ATTRIBUTESET_ID")).thenReturn(null);
-
-        Product product = new Product("prod2", "COLA", "Cola", 2.50f, "drinks", null);
-        product.setId(2L);
-        when(repository.findAll()).thenReturn(List.of(product));
-
-        mockMvc.perform(get("/products/drinks"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$._embedded.*[0].name").value("Cola"));
-    }
-
-    @Test
-    void getByCategory_passesCategoryIdAsQueryParameter() throws Exception {
-        when(mockResultSet.next()).thenReturn(false);
-        when(repository.findAll()).thenReturn(List.of());
-
-        mockMvc.perform(get("/products/cat1")).andExpect(status().isOk());
-
-        verify(mockStatement).setString(1, "cat1");
+        mockMvc.perform(get("/products"))
+                .andExpect(status().isInternalServerError());
     }
 
     @Test
     void getById_returnsProduct() throws Exception {
-        Product product = new Product("prod1", "BURGER", "Burger", 9.99f, "cat1", null);
-        product.setId(1L);
-        when(repository.findById(1L)).thenReturn(Optional.of(product));
+        Product product = new Product("prod1", "REF1", "BURGER", "Burger", 5.00, 9.99, "tax1", "cat1", "unit", "attrset1");
+        when(repository.findById("prod1")).thenReturn(Optional.of(product));
 
-        mockMvc.perform(get("/product/1"))
+        mockMvc.perform(get("/products/prod1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Burger"))
                 .andExpect(jsonPath("$.pricesell").value(9.99));
@@ -160,48 +80,65 @@ class ProductsControllerTest {
 
     @Test
     void getById_returns404WhenNotFound() throws Exception {
-        when(repository.findById(99L)).thenReturn(Optional.empty());
+        when(repository.findById("missing")).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/product/99"))
+        mockMvc.perform(get("/products/missing"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    void put_updatesExistingProduct() throws Exception {
-        Product existing = new Product("prod1", "BURGER", "Burger", 9.99f, "food", null);
-        existing.setId(1L);
-        Product updated = new Product("prod1", "BURGER", "Premium Burger", 12.99f, "food", null);
-        updated.setId(1L);
+    void create_savesAndReturnsProductWithGeneratedId() throws Exception {
+        when(repository.insert(any(Product.class))).thenAnswer(invocation -> {
+            Product p = invocation.getArgument(0);
+            p.setId("generated-id");
+            return p;
+        });
 
-        when(repository.findById(1L)).thenReturn(Optional.of(existing));
-        when(repository.save(any())).thenReturn(updated);
+        mockMvc.perform(post("/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Fries\",\"code\":\"FRIES\",\"pricesell\":3.50,\"categoryId\":\"food\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id_").value("generated-id"))
+                .andExpect(jsonPath("$.name").value("Fries"));
+    }
 
-        mockMvc.perform(put("/product/1")
+    @Test
+    void update_updatesExistingProduct() throws Exception {
+        when(repository.update(eq("prod1"), any(Product.class))).thenReturn(true);
+
+        mockMvc.perform(put("/products/prod1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"Premium Burger\",\"code\":\"BURGER\",\"pricesell\":12.99,\"categoryId\":\"food\"}"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id_").value("prod1"))
                 .andExpect(jsonPath("$.name").value("Premium Burger"));
     }
 
     @Test
-    void put_createsProductWhenNotFound() throws Exception {
-        Product newProduct = new Product("prod3", "FRIES", "Fries", 3.50f, "food", null);
-        newProduct.setId(3L);
+    void update_returns404WhenNotFound() throws Exception {
+        when(repository.update(eq("missing"), any(Product.class))).thenReturn(false);
 
-        when(repository.findById(3L)).thenReturn(Optional.empty());
-        when(repository.save(any())).thenReturn(newProduct);
-
-        mockMvc.perform(put("/product/3")
+        mockMvc.perform(put("/products/missing")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Fries\",\"code\":\"FRIES\",\"pricesell\":3.50,\"categoryId\":\"food\"}"))
-                .andExpect(status().isOk());
+                .content("{\"name\":\"Ghost\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void delete_callsRepositoryDeleteById() throws Exception {
-        mockMvc.perform(delete("/products/1"))
-                .andExpect(status().isOk());
+    void delete_deletesExistingProduct() throws Exception {
+        when(repository.deleteById("prod1")).thenReturn(true);
 
-        verify(repository).deleteById(1L);
+        mockMvc.perform(delete("/products/prod1"))
+                .andExpect(status().isNoContent());
+
+        verify(repository).deleteById("prod1");
+    }
+
+    @Test
+    void delete_returns404WhenNotFound() throws Exception {
+        when(repository.deleteById("missing")).thenReturn(false);
+
+        mockMvc.perform(delete("/products/missing"))
+                .andExpect(status().isNotFound());
     }
 }

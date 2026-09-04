@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: w4cash.taxcategory.TaxCategoriesControllerTest
+-------------------------------------------------------------------------------
+Tests run: 16, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.709 s -- in w4cash.taxcategory.TaxCategoriesControllerTest

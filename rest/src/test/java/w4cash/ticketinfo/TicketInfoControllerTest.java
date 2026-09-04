@@ -29,15 +29,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.openbravo.pos.ticket.TicketInfo;
 
 import w4cash.LoadDatabase;
+import javax.sql.DataSource;
 
 @WebMvcTest(TicketInfoController.class)
 class TicketInfoControllerTest {
 
     @Autowired
     MockMvc mockMvc;
-
-    @MockBean
-    SharedTicketRepository repository;
 
     @MockBean
     w4cash.print.TicketPrintService ticketPrintService;
@@ -68,7 +66,9 @@ class TicketInfoControllerTest {
         mockUpdateStmt = mock(PreparedStatement.class);
         mockDeleteStmt = mock(PreparedStatement.class);
 
-        LoadDatabase.DBConnection = mockConnection;
+        DataSource mockDataSource = mock(DataSource.class);
+        when(mockDataSource.getConnection()).thenReturn(mockConnection);
+        LoadDatabase.setDataSource(mockDataSource);
 
         // Stub ordering: most general first, most specific last (last match wins in Mockito).
         when(mockConnection.prepareStatement(anyString())).thenReturn(mockSelectStmt);
@@ -86,7 +86,7 @@ class TicketInfoControllerTest {
 
     @AfterEach
     void tearDown() {
-        LoadDatabase.DBConnection = null;
+        LoadDatabase.setDataSource(null);
     }
 
     // ── GET /TicketInfos ──────────────────────────────────────────────────────
@@ -94,7 +94,6 @@ class TicketInfoControllerTest {
     @Test
     void getAllTicketInfos_returnsEmptyCollection() throws Exception {
         when(mockResultSet.next()).thenReturn(false);
-        when(repository.findAll()).thenReturn(List.of());
 
         mockMvc.perform(get("/TicketInfos"))
                 .andExpect(status().isOk())
@@ -102,13 +101,10 @@ class TicketInfoControllerTest {
     }
 
     @Test
-    void getAllTicketInfos_returnsTickets() throws Exception {
+    void getAllTicketInfos_returnsTicketsStraightFromOracle() throws Exception {
         when(mockResultSet.next()).thenReturn(true, false);
         when(mockResultSet.getString("ID")).thenReturn("t1");
         when(mockResultSet.getString("NAME")).thenReturn("Table 1");
-
-        SharedTicket ticket = new SharedTicket("t1", "Table 1");
-        when(repository.findAll()).thenReturn(List.of(ticket));
 
         mockMvc.perform(get("/TicketInfos"))
                 .andExpect(status().isOk())
@@ -116,16 +112,15 @@ class TicketInfoControllerTest {
     }
 
     @Test
-    void getAllTicketInfos_syncsDatabaseBeforeReturning() throws Exception {
-        when(mockResultSet.next()).thenReturn(true, false);
-        when(mockResultSet.getString("ID")).thenReturn("t1");
-        when(mockResultSet.getString("NAME")).thenReturn("Table 1");
-        when(repository.findAll()).thenReturn(List.of());
+    void getAllTicketInfos_returnsEveryRow() throws Exception {
+        when(mockResultSet.next()).thenReturn(true, true, false);
+        when(mockResultSet.getString("ID")).thenReturn("t1", "t2");
+        when(mockResultSet.getString("NAME")).thenReturn("Table 1", "Table 2");
 
-        mockMvc.perform(get("/TicketInfos")).andExpect(status().isOk());
-
-        verify(repository).deleteAll();
-        verify(repository).save(any(SharedTicket.class));
+        mockMvc.perform(get("/TicketInfos"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$._embedded.*[0].name").value("Table 1"))
+                .andExpect(jsonPath("$._embedded.*[1].name").value("Table 2"));
     }
 
     // ── GET /orderitem/{tableId}/{tableName}/{lockby} ─────────────────────────
@@ -229,16 +224,6 @@ class TicketInfoControllerTest {
 
         verify(mockDeleteStmt).setString(1, "table1");
         verify(mockDeleteStmt).executeUpdate();
-    }
-
-    // ── DELETE /TicketInfo/{id} ───────────────────────────────────────────────
-
-    @Test
-    void deleteTicketInfo_callsRepositoryDeleteById() throws Exception {
-        mockMvc.perform(delete("/TicketInfo/1"))
-                .andExpect(status().isOk());
-
-        verify(repository).deleteById(1L);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
