@@ -19,7 +19,8 @@ import com.zaxxer.hikari.HikariDataSource;
  * <p>
  * Both must be declared here: Boot's {@code DataSourceAutoConfiguration} is
  * {@code @ConditionalOnMissingBean(DataSource.class)}, so as soon as the Oracle
- * pool below exists the auto-configured H2 datasource that JPA/Hibernate used to
+ * pool below exists the auto-configured H2 datasource that JPA/Hibernate used
+ * to
  * bind to disappears. {@link #jpaDataSource()} restores it, and stays
  * {@code @Primary} so Hibernate keeps binding to H2 exactly as before.
  */

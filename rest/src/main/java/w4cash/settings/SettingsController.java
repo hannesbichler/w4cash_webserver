@@ -34,47 +34,14 @@ class SettingsController {
 		this.repository = repository;
 	}
 
-	// Aggregate root
-
-	// tag::get-single-item[]
-	@GetMapping("/tablets")
-	CollectionModel<EntityModel<Settings>> allTablets() {
-		logger.info("GET /tablets request was called");
-		List<EntityModel<Settings>> settingsList = new ArrayList<>();
-		try (Connection conn = LoadDatabase.getConnection();
-				PreparedStatement st = conn
-				.prepareStatement(
-						"SELECT MONEY, HOST, HOSTSEQUENCE, DATESTART, DATEEND FROM CLOSEDCASH")) {
-			// st.setString(1, tabletId);
-			try (ResultSet rs = st.executeQuery()) {
-				var index = 1;
-				settingsList.add(EntityModel.of(new Settings("Tablet1", 100, 200, 300, 400)));
-				settingsList.add(EntityModel.of(new Settings("Tablet2", 100, 200, 300, 400)));
-				settingsList.add(EntityModel.of(new Settings("Tablet3", 100, 200, 300, 400)));
-				settingsList.add(EntityModel.of(new Settings("Tablet4", 100, 200, 300, 400)));
-				settingsList.add(EntityModel.of(new Settings("Tablet5", 100, 200, 300, 400)));
-				settingsList.add(EntityModel.of(new Settings("Tablet6", 100, 200, 300, 400)));
-				while (rs.next()) {
-					settingsList.add(EntityModel.of(new Settings("Tablet" + index, 100, 200, 300, 400)));
-					index++;
-					break;
-				}
-			}
-		} catch (SQLException e) {
-			e.printStackTrace();
-		}
-
-		return CollectionModel.of(settingsList);
-	}
-
 	@GetMapping("/settings/{tabletId}")
 	CollectionModel<EntityModel<Settings>> all(@PathVariable String tabletId) {
 		logger.info("GET /settings request was called for tabletId={}", tabletId);
 		List<EntityModel<Settings>> settingsList = new ArrayList<>();
 		try (Connection conn = LoadDatabase.getConnection();
 				PreparedStatement st = conn
-				.prepareStatement(
-						"SELECT CONTENT from RESOURCES where NAME=?")) {
+						.prepareStatement(
+								"SELECT CONTENT from RESOURCES where NAME=?")) {
 			st.setString(1, tabletId + "/properties");
 			try (ResultSet rs = st.executeQuery()) {
 				while (rs.next()) {
@@ -112,5 +79,4 @@ class SettingsController {
 
 		return CollectionModel.of(settingsList);
 	}
-	// end::get-single-item[]
 }

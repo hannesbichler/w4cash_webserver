@@ -72,16 +72,19 @@ class ActiveCashController {
 						openNew,
 						ignoreCache);
 				// create a new ActiveCash entry
-				try (OraclePreparedStatement st = (OraclePreparedStatement) conn.prepareStatement(
+				try (PreparedStatement st = conn.prepareStatement(
 						"INSERT INTO CLOSEDCASH (MONEY, HOST, DATESTART, DATEEND, HOSTSEQUENCE, LOCATION) VALUES (?, ?, ?, ?, (SELECT NVL(max(hostsequence),0)+1 FROM CLOSEDCASH), '0') RETURNING HOSTSEQUENCE INTO ?")) {
+					// pooled statement is a Hikari proxy; unwrap to reach Oracle-only
+					// return-parameter API
+					OraclePreparedStatement ost = st.unwrap(OraclePreparedStatement.class);
 					var id = UUID.randomUUID().toString();
-					st.setString(1, id);
-					st.setString(2, tabletId);
-					st.setTimestamp(3, new java.sql.Timestamp(System.currentTimeMillis())); // DATESTART
-					st.setString(4, null); // DATEEND
-					st.registerReturnParameter(5, OracleTypes.VARCHAR);
-					st.executeUpdate();
-					try (ResultSet generatedKeys = st.getReturnResultSet()) {
+					ost.setString(1, id);
+					ost.setString(2, tabletId);
+					ost.setTimestamp(3, new java.sql.Timestamp(System.currentTimeMillis())); // DATESTART
+					ost.setString(4, null); // DATEEND
+					ost.registerReturnParameter(5, OracleTypes.VARCHAR);
+					ost.executeUpdate();
+					try (ResultSet generatedKeys = ost.getReturnResultSet()) {
 						if (generatedKeys.next()) {
 							String hostSequence = generatedKeys.getString(1);
 							activeCash = new ActiveCash(tabletId, id, tabletId, hostSequence, null, null);

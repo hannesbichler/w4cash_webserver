@@ -16,14 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import w4cash.LoadDatabase;
@@ -83,78 +76,6 @@ class CategoryController {
 				.collect(Collectors.toList());
 
 		return CollectionModel.of(categories, linkTo(methodOn(CategoryController.class).all()).withSelfRel());
-	}
-
-	@PostMapping("/categories")
-	ResponseEntity<?> create(@RequestBody Category body) {
-		String error = validate(body, null);
-		if (error != null) {
-			return ResponseEntity.badRequest().body(error);
-		}
-		try {
-			return ResponseEntity.status(HttpStatus.CREATED)
-					.body(repository.insert(body.getName().trim(), body.getParentId(), body.getPrinter()));
-		} catch (SQLException e) {
-			logger.error("Failed to create category", e);
-			return ResponseEntity.internalServerError().body("Failed to create category: " + e.getMessage());
-		}
-	}
-
-	@PutMapping("/categories/{id}")
-	ResponseEntity<?> update(@PathVariable String id, @RequestBody Category body) {
-		String error = validate(body, id);
-		if (error != null) {
-			return ResponseEntity.badRequest().body(error);
-		}
-		try {
-			if (repository.wouldCycle(id, body.getParentId())) {
-				return ResponseEntity.badRequest().body("A category cannot be its own parent or descendant");
-			}
-			if (!repository.update(id, body.getName().trim(), body.getParentId(), body.getPrinter())) {
-				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No category with id=" + id);
-			}
-			body.setId_(id);
-			return ResponseEntity.ok(body);
-		} catch (SQLException e) {
-			logger.error("Failed to update category id={}", id, e);
-			return ResponseEntity.internalServerError().body("Failed to update category: " + e.getMessage());
-		}
-	}
-
-	@DeleteMapping("/categories/{id}")
-	ResponseEntity<?> delete(@PathVariable String id) {
-		try {
-			if (!repository.exists(id)) {
-				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No category with id=" + id);
-			}
-			// PRODUCTS.CATEGORY and CATEGORIES.PARENTID both reference this row, so say which
-			// one is in the way instead of letting the constraint surface as a 500.
-			int children = repository.countChildren(id);
-			if (children > 0) {
-				return ResponseEntity.status(HttpStatus.CONFLICT)
-						.body("Category still has " + children + " subcategories");
-			}
-			int products = repository.countProducts(id);
-			if (products > 0) {
-				return ResponseEntity.status(HttpStatus.CONFLICT)
-						.body("Category still has " + products + " products");
-			}
-			repository.deleteById(id);
-			return ResponseEntity.noContent().build();
-		} catch (SQLException e) {
-			logger.error("Failed to delete category id={}", id, e);
-			return ResponseEntity.internalServerError().body("Failed to delete category: " + e.getMessage());
-		}
-	}
-
-	private String validate(Category body, String id) {
-		if (body == null || body.getName() == null || body.getName().isBlank()) {
-			return "name is required";
-		}
-		if (id != null && id.equals(body.getParentId())) {
-			return "A category cannot be its own parent";
-		}
-		return null;
 	}
 
 	/**

@@ -16,27 +16,29 @@ import w4cash.LoadDatabase;
 @Component
 public class ProductsRepository {
 
-	private static final String SELECT_COLUMNS =
-			"P.ID, P.REFERENCE, P.CODE, P.NAME, P.PRICEBUY, P.PRICESELL, P.TAXCAT, P.CATEGORY, P.UNIT, " +
+	private static final String SELECT_COLUMNS = "P.ID, P.REFERENCE, P.CODE, P.NAME, P.PRICEBUY, P.PRICESELL, P.TAXCAT, P.CATEGORY, P.UNIT, "
+			+
 			"P.ATTRIBUTESET_ID, CASE WHEN C.PRODUCT IS NULL THEN 0 ELSE 1 END AS ACTIVE";
-	// The catalog membership carries the active flag, so every read joins PRODUCTS_CAT.
-	private static final String SELECT_FROM = " FROM PRODUCTS P LEFT JOIN PRODUCTS_CAT C ON P.ID = C.PRODUCT";
+	// The catalog membership carries the active flag, so every read joins
+	// PRODUCTS_CAT.
+	private static final String SELECT_FROM = " FROM PRODUCTS P JOIN PRODUCTS_CAT C ON P.ID = C.PRODUCT";
 	private static final String SELECT_ALL = "SELECT " + SELECT_COLUMNS + SELECT_FROM + " ORDER BY P.NAME";
-	private static final String SELECT_BY_CATEGORY =
-			"SELECT " + SELECT_COLUMNS + SELECT_FROM + " WHERE P.CATEGORY = ? ORDER BY P.NAME";
+	private static final String SELECT_BY_CATEGORY = "SELECT " + SELECT_COLUMNS + SELECT_FROM
+			+ " WHERE P.CATEGORY = ? ORDER BY P.NAME";
 	private static final String SELECT_BY_ID = "SELECT " + SELECT_COLUMNS + SELECT_FROM + " WHERE P.ID = ?";
 
-	private static final String INSERT_SQL =
-			"INSERT INTO PRODUCTS (ID, REFERENCE, CODE, NAME, PRICEBUY, PRICESELL, TAXCAT, CATEGORY, UNIT, ATTRIBUTESET_ID) " +
+	private static final String INSERT_SQL = "INSERT INTO PRODUCTS (ID, REFERENCE, CODE, NAME, PRICEBUY, PRICESELL, TAXCAT, CATEGORY, UNIT, ATTRIBUTESET_ID) "
+			+
 			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-	private static final String UPDATE_SQL =
-			"UPDATE PRODUCTS SET REFERENCE = ?, CODE = ?, NAME = ?, PRICEBUY = ?, PRICESELL = ?, TAXCAT = ?, " +
+	private static final String UPDATE_SQL = "UPDATE PRODUCTS SET REFERENCE = ?, CODE = ?, NAME = ?, PRICEBUY = ?, PRICESELL = ?, TAXCAT = ?, "
+			+
 			"CATEGORY = ?, UNIT = ?, ATTRIBUTESET_ID = ? WHERE ID = ?";
 
 	private static final String DELETE_SQL = "DELETE FROM PRODUCTS WHERE ID = ?";
 
-	// CATORDER stays NULL: it only orders the catalog buttons, and the desktop app reads it as
+	// CATORDER stays NULL: it only orders the catalog buttons, and the desktop app
+	// reads it as
 	// NVL(CATORDER, 2147483647), so a product added here simply sorts last.
 	private static final String CATALOG_INSERT_SQL = "INSERT INTO PRODUCTS_CAT (PRODUCT, CATORDER) VALUES (?, NULL)";
 	private static final String CATALOG_DELETE_SQL = "DELETE FROM PRODUCTS_CAT WHERE PRODUCT = ?";
@@ -50,8 +52,7 @@ public class ProductsRepository {
 	// MAX(numeric reference)+1 across all products, matching the simpler
 	// next-number convention already used elsewhere in this webserver (ticket id,
 	// CLOSEDCASH hostsequence).
-	private static final String NEXT_NUMBER_SQL =
-			"SELECT NVL(MAX(TO_NUMBER(REFERENCE)),0)+1 FROM PRODUCTS WHERE REGEXP_LIKE(REFERENCE, '^[0-9]+$')";
+	private static final String NEXT_NUMBER_SQL = "SELECT NVL(MAX(TO_NUMBER(REFERENCE)),0)+1 FROM PRODUCTS WHERE REGEXP_LIKE(REFERENCE, '^[0-9]+$')";
 
 	public List<Product> findAll(String categoryId) throws SQLException {
 		boolean byCategory = categoryId != null && !categoryId.isBlank();
@@ -187,8 +188,10 @@ public class ProductsRepository {
 		}
 	}
 
-	// The flag is the presence of the PRODUCTS_CAT row, so switching it on inserts that row and
-	// switching it off deletes it - the same thing the desktop catalog checkbox does.
+	// The flag is the presence of the PRODUCTS_CAT row, so switching it on inserts
+	// that row and
+	// switching it off deletes it - the same thing the desktop catalog checkbox
+	// does.
 	private void setCatalogMembership(Connection conn, String productId, boolean active) throws SQLException {
 		if (!active) {
 			try (PreparedStatement st = conn.prepareStatement(CATALOG_DELETE_SQL)) {
@@ -221,7 +224,8 @@ public class ProductsRepository {
 
 	public boolean deleteById(String id) throws SQLException {
 		try (Connection conn = LoadDatabase.getConnection()) {
-			// PRODUCTS_CAT.PRODUCT is a foreign key to PRODUCTS.ID, so the catalog row of an
+			// PRODUCTS_CAT.PRODUCT is a foreign key to PRODUCTS.ID, so the catalog row of
+			// an
 			// active product has to go first or the delete is rejected.
 			try (PreparedStatement st = conn.prepareStatement(CATALOG_DELETE_SQL)) {
 				st.setString(1, id);
