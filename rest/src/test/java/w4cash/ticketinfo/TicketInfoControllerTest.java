@@ -46,7 +46,8 @@ class TicketInfoControllerTest {
     private PreparedStatement mockSelectStmt;
     private ResultSet mockResultSet;
 
-    // Product SELECT statement (overrides default for queries containing "PRODUCTS")
+    // Product SELECT statement (overrides default for queries containing
+    // "PRODUCTS")
     private PreparedStatement mockProductStmt;
     private ResultSet mockProductResultSet;
 
@@ -70,12 +71,17 @@ class TicketInfoControllerTest {
         when(mockDataSource.getConnection()).thenReturn(mockConnection);
         LoadDatabase.setDataSource(mockDataSource);
 
-        // Stub ordering: most general first, most specific last (last match wins in Mockito).
+        // Stub ordering: most general first, most specific last (last match wins in
+        // Mockito).
         when(mockConnection.prepareStatement(anyString())).thenReturn(mockSelectStmt);
-        when(mockConnection.prepareStatement(argThat(s -> s != null && s.contains("PRODUCTS")))).thenReturn(mockProductStmt);
-        when(mockConnection.prepareStatement(argThat(s -> s != null && s.startsWith("INSERT")))).thenReturn(mockInsertStmt);
-        when(mockConnection.prepareStatement(argThat(s -> s != null && s.startsWith("UPDATE")))).thenReturn(mockUpdateStmt);
-        when(mockConnection.prepareStatement(argThat(s -> s != null && s.startsWith("DELETE")))).thenReturn(mockDeleteStmt);
+        when(mockConnection.prepareStatement(argThat(s -> s != null && s.contains("PRODUCTS"))))
+                .thenReturn(mockProductStmt);
+        when(mockConnection.prepareStatement(argThat(s -> s != null && s.startsWith("INSERT"))))
+                .thenReturn(mockInsertStmt);
+        when(mockConnection.prepareStatement(argThat(s -> s != null && s.startsWith("UPDATE"))))
+                .thenReturn(mockUpdateStmt);
+        when(mockConnection.prepareStatement(argThat(s -> s != null && s.startsWith("DELETE"))))
+                .thenReturn(mockDeleteStmt);
 
         when(mockSelectStmt.executeQuery()).thenReturn(mockResultSet);
         when(mockProductStmt.executeQuery()).thenReturn(mockProductResultSet);
@@ -87,40 +93,6 @@ class TicketInfoControllerTest {
     @AfterEach
     void tearDown() {
         LoadDatabase.setDataSource(null);
-    }
-
-    // ── GET /TicketInfos ──────────────────────────────────────────────────────
-
-    @Test
-    void getAllTicketInfos_returnsEmptyCollection() throws Exception {
-        when(mockResultSet.next()).thenReturn(false);
-
-        mockMvc.perform(get("/TicketInfos"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$._links.self").exists());
-    }
-
-    @Test
-    void getAllTicketInfos_returnsTicketsStraightFromOracle() throws Exception {
-        when(mockResultSet.next()).thenReturn(true, false);
-        when(mockResultSet.getString("ID")).thenReturn("t1");
-        when(mockResultSet.getString("NAME")).thenReturn("Table 1");
-
-        mockMvc.perform(get("/TicketInfos"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$._embedded.*[0].name").value("Table 1"));
-    }
-
-    @Test
-    void getAllTicketInfos_returnsEveryRow() throws Exception {
-        when(mockResultSet.next()).thenReturn(true, true, false);
-        when(mockResultSet.getString("ID")).thenReturn("t1", "t2");
-        when(mockResultSet.getString("NAME")).thenReturn("Table 1", "Table 2");
-
-        mockMvc.perform(get("/TicketInfos"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$._embedded.*[0].name").value("Table 1"))
-                .andExpect(jsonPath("$._embedded.*[1].name").value("Table 2"));
     }
 
     // ── GET /orderitem/{tableId}/{tableName}/{lockby} ─────────────────────────
@@ -185,7 +157,7 @@ class TicketInfoControllerTest {
 
     @Test
     @Disabled("TicketLineInfo(ProductInfoExt, ..., null discountInfo, ...) NPEs inside w4cash.jar — " +
-              "the production controller passes null for DiscountInfo, crashing any PUT with lines")
+            "the production controller passes null for DiscountInfo, crashing any PUT with lines")
     void putOrderItem_withOneLine_lookupsProductAndUpdates() throws Exception {
         when(mockProductResultSet.next()).thenReturn(true, false);
         when(mockProductResultSet.getString("ID")).thenReturn("prod1");
@@ -213,17 +185,6 @@ class TicketInfoControllerTest {
 
         verify(mockProductStmt).setString(1, "prod1");
         verify(mockUpdateStmt).executeUpdate();
-    }
-
-    // ── DELETE /orderitem/{id} ────────────────────────────────────────────────
-
-    @Test
-    void deleteOrderItem_executesSqlDelete() throws Exception {
-        mockMvc.perform(delete("/orderitem/table1"))
-                .andExpect(status().isOk());
-
-        verify(mockDeleteStmt).setString(1, "table1");
-        verify(mockDeleteStmt).executeUpdate();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

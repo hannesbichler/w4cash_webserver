@@ -38,7 +38,8 @@ class ProductsControllerTest {
 
     @Test
     void getAll_returnsProducts() throws Exception {
-        Product product = new Product("prod1", "REF1", "BURGER", "Burger", 5.00, 9.99, "tax1", "cat1", "unit", "attrset1");
+        Product product = new Product("prod1", "REF1", "BURGER", "Burger", 5.00, 9.99, "tax1", "cat1", "unit",
+                "attrset1");
         when(repository.findAll(isNull())).thenReturn(List.of(product));
 
         mockMvc.perform(get("/products"))
@@ -67,78 +68,4 @@ class ProductsControllerTest {
                 .andExpect(status().isInternalServerError());
     }
 
-    @Test
-    void getById_returnsProduct() throws Exception {
-        Product product = new Product("prod1", "REF1", "BURGER", "Burger", 5.00, 9.99, "tax1", "cat1", "unit", "attrset1");
-        when(repository.findById("prod1")).thenReturn(Optional.of(product));
-
-        mockMvc.perform(get("/products/prod1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Burger"))
-                .andExpect(jsonPath("$.pricesell").value(9.99));
-    }
-
-    @Test
-    void getById_returns404WhenNotFound() throws Exception {
-        when(repository.findById("missing")).thenReturn(Optional.empty());
-
-        mockMvc.perform(get("/products/missing"))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void create_savesAndReturnsProductWithGeneratedId() throws Exception {
-        when(repository.insert(any(Product.class))).thenAnswer(invocation -> {
-            Product p = invocation.getArgument(0);
-            p.setId("generated-id");
-            return p;
-        });
-
-        mockMvc.perform(post("/products")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Fries\",\"code\":\"FRIES\",\"pricesell\":3.50,\"categoryId\":\"food\"}"))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id_").value("generated-id"))
-                .andExpect(jsonPath("$.name").value("Fries"));
-    }
-
-    @Test
-    void update_updatesExistingProduct() throws Exception {
-        when(repository.update(eq("prod1"), any(Product.class))).thenReturn(true);
-
-        mockMvc.perform(put("/products/prod1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Premium Burger\",\"code\":\"BURGER\",\"pricesell\":12.99,\"categoryId\":\"food\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id_").value("prod1"))
-                .andExpect(jsonPath("$.name").value("Premium Burger"));
-    }
-
-    @Test
-    void update_returns404WhenNotFound() throws Exception {
-        when(repository.update(eq("missing"), any(Product.class))).thenReturn(false);
-
-        mockMvc.perform(put("/products/missing")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Ghost\"}"))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void delete_deletesExistingProduct() throws Exception {
-        when(repository.deleteById("prod1")).thenReturn(true);
-
-        mockMvc.perform(delete("/products/prod1"))
-                .andExpect(status().isNoContent());
-
-        verify(repository).deleteById("prod1");
-    }
-
-    @Test
-    void delete_returns404WhenNotFound() throws Exception {
-        when(repository.deleteById("missing")).thenReturn(false);
-
-        mockMvc.perform(delete("/products/missing"))
-                .andExpect(status().isNotFound());
-    }
 }

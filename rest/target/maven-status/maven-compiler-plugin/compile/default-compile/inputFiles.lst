@@ -32,8 +32,6 @@ C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\product\Product.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\product\ProductsController.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\floors\FloorController.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\floors\Floor.java
-C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\printer\PrinterController.java
-C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\report\ReportsController.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\category\Category.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\places\PlaceController.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\print\TicketParser.java
@@ -52,12 +50,10 @@ C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\receipt\ActiveCashContr
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\auth\OtpController.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\person\PersonController.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\floors\FloorsRepository.java
-C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\attribute\AttributesController.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\receipt\ActiveCashRepository.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\attribute\AttributeSetRef.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\attribute\AttributeValuesRepository.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\DataSourceConfig.java
-C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\kassenabschluss\KassenabschlussController.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\attribute\AttributeSetsController.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\taxcategory\TaxCategoryDetail.java
 C:\BTech\java\w4cash_webserver\rest\src\main\java\w4cash\receipt\ActiveCash.java
